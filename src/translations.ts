@@ -97,6 +97,8 @@ export const translations = {
     editRecord: '编辑记录',
     addRecord: '新增记录',
     confirmDelete: '确认删除吗？',
+    clearAll: '一键清空',
+    confirmClearAll: '确定要清空所有数据吗？此操作不可恢复。',
     
     // Footer
     footerText: '© 2026 意国蓝天｜大梨教育数字化管理平台 v3.0.0',
@@ -197,6 +199,8 @@ export const translations = {
     editRecord: 'Modifica Record',
     addRecord: 'Aggiungi Record',
     confirmDelete: 'Confermi l\'eliminazione?',
+    clearAll: 'Svuota Tutto',
+    confirmClearAll: 'Sei sicuro di voler cancellare tutti i dati? Questa operazione non può essere annullata.',
     
     // Footer
     footerText: '© 2026 Italysky | Piattaforma di Gestione Digitale Dali Education v3.0.0',

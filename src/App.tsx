@@ -329,6 +329,22 @@ export default function App() {
     } else if (modalConfig.type === 'collaboration') {
       const newItem = { task: data.task as string, from: data.from as Employee, to: data.to as Employee };
       setSalesConversion(prev => ({ ...prev, collaborations: [...prev.collaborations, newItem] }));
+    } else if (modalConfig.type === 'clearAll') {
+      setYesterdayClasses([]);
+      setYesterdayMedia([]);
+      setTodayClasses([]);
+      setAgencyTracking([]);
+      setStudentRegistrations([]);
+      setClassFormations([]);
+      setTrialClasses([]);
+      setMediaOperations([]);
+      setSalesConversion({ newLeads: [], followUpCustomers: [], collaborations: [] });
+      setFinanceRecords([]);
+      setOfflineVisits([]);
+      setTodoList([]);
+      setCooperationNote('');
+      setRedList([]);
+      setBossInstructions([]);
     }
 
     closeModal();
@@ -424,12 +440,19 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            <span className="text-xs text-slate-400 hidden md:inline-block">
+            <button
+              onClick={() => openModal('clearAll', t.clearAll)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
+            >
+              <Trash2 className="w-4 h-4" />
+              {t.clearAll}
+            </button>
+            <span className="text-xs text-slate-400 hidden md:inline-block whitespace-nowrap">
               {t.printHint}
             </span>
             <button
               onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-bold transition-all shadow-lg"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap"
             >
               <FileSpreadsheet className="w-4 h-4" />
               {t.exportExcel}
@@ -1118,6 +1141,11 @@ export default function App() {
                   <Select label={t.to} name="to" options={EMPLOYEES} />
                 </>
               )}
+              {modalConfig.type === 'clearAll' && (
+                <div className="py-4 text-center text-slate-700 font-medium">
+                  {t.confirmClearAll}
+                </div>
+              )}
 
               <div className="pt-4 flex gap-3">
                 <button 
@@ -1129,9 +1157,14 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-brand-blue text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
+                  className={cn(
+                    "flex-1 px-4 py-2.5 text-white rounded-xl font-bold transition-colors shadow-lg",
+                    modalConfig.type === 'clearAll' 
+                      ? "bg-red-600 hover:bg-red-700" 
+                      : "bg-brand-blue hover:bg-blue-600"
+                  )}
                 >
-                  {t.save}
+                  {modalConfig.type === 'clearAll' ? t.clearAll : t.save}
                 </button>
               </div>
             </form>
