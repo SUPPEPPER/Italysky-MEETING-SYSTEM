@@ -46,7 +46,7 @@ import {
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { auth } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { 
   Employee,
   YesterdayClass,
@@ -89,7 +89,6 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
@@ -104,11 +103,7 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     try {
-      if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       console.error("Auth failed", error);
       setAuthError(error.message || 'Authentication failed');
@@ -460,16 +455,9 @@ export default function App() {
               type="submit"
               className="w-full py-3 px-4 bg-brand-blue text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg flex items-center justify-center gap-2"
             >
-              {isRegistering ? 'Create Account' : 'Sign In'}
+              Sign In
             </button>
           </form>
-          
-          <button 
-            onClick={() => setIsRegistering(!isRegistering)}
-            className="mt-6 text-sm text-slate-500 hover:text-brand-blue transition-colors"
-          >
-            {isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register'}
-          </button>
         </div>
       </div>
     );
