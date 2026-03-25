@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestore-error';
 
-export function useFirestoreData<T>(key: string, initialValue: T, userId: string | undefined) {
+export function useFirestoreData<T>(key: string, initialValue: T, userId: string | undefined, dateString?: string) {
   const [data, setData] = useState<T>(initialValue);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -13,7 +13,8 @@ export function useFirestoreData<T>(key: string, initialValue: T, userId: string
       return;
     }
 
-    const docRef = doc(db, 'shared', 'dashboard');
+    const docId = dateString ? `dashboard_${dateString}` : 'dashboard';
+    const docRef = doc(db, 'shared', docId);
     
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -32,30 +33,31 @@ export function useFirestoreData<T>(key: string, initialValue: T, userId: string
       }
       setIsInitialized(true);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `shared/dashboard`);
+      handleFirestoreError(error, OperationType.GET, `shared/${docId}`);
     });
 
     return () => unsubscribe();
-  }, [key, userId]);
+  }, [key, userId, dateString]);
 
   const updateData = useCallback((newValue: T | ((prev: T) => T)) => {
     setData((prev) => {
       const valueToStore = newValue instanceof Function ? newValue(prev) : newValue;
       
       if (userId) {
-        const docRef = doc(db, 'shared', 'dashboard');
+        const docId = dateString ? `dashboard_${dateString}` : 'dashboard';
+        const docRef = doc(db, 'shared', docId);
         setDoc(docRef, {
           uid: userId,
           [key]: JSON.stringify(valueToStore),
           updatedAt: new Date()
         }, { merge: true }).catch(error => {
-          handleFirestoreError(error, OperationType.WRITE, `shared/dashboard`);
+          handleFirestoreError(error, OperationType.WRITE, `shared/${docId}`);
         });
       }
       
       return valueToStore;
     });
-  }, [key, userId]);
+  }, [key, userId, dateString]);
 
   return [data, updateData, isInitialized] as const;
 }

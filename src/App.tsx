@@ -60,7 +60,8 @@ import {
   SalesConversion,
   FinanceRecord,
   OfflineVisit,
-  ToDoItem
+  ToDoItem,
+  MeetingRecord
 } from './types';
 import { 
   EMPLOYEES,
@@ -76,7 +77,8 @@ import {
   INITIAL_MEDIA_OPERATIONS,
   INITIAL_SALES_CONVERSION,
   INITIAL_FINANCE_RECORDS,
-  INITIAL_OFFLINE_VISITS
+  INITIAL_OFFLINE_VISITS,
+  INITIAL_MEETING_RECORDS
 } from './constants';
 import { Language, translations } from './translations';
 import { useFirestoreData } from './hooks/useFirestoreData';
@@ -122,25 +124,30 @@ export default function App() {
   const [lang, setLang] = useFirestoreData<Language>('lang', 'zh', user?.uid);
   const t = translations[lang];
 
-  const [yesterdayClasses, setYesterdayClasses, init1] = useFirestoreData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid);
-  const [yesterdayMedia, setYesterdayMedia, init2] = useFirestoreData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid);
-  const [todayClasses, setTodayClasses, init3] = useFirestoreData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid);
-  const [agencyTracking, setAgencyTracking, init4] = useFirestoreData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid);
-  const [studentRegistrations, setStudentRegistrations, init5] = useFirestoreData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid);
-  const [classFormations, setClassFormations, init6] = useFirestoreData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid);
-  const [trialClasses, setTrialClasses, init7] = useFirestoreData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid);
-  const [mediaOperations, setMediaOperations, init8] = useFirestoreData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid);
-  const [salesConversion, setSalesConversion, init9] = useFirestoreData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid);
-  const [financeRecords, setFinanceRecords, init10] = useFirestoreData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid);
-  const [offlineVisits, setOfflineVisits, init11] = useFirestoreData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid);
-  const [todoList, setTodoList, init12] = useFirestoreData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid);
   const [cooperationNote, setCooperationNote, init13] = useFirestoreData('cooperationNote', '', user?.uid);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Format date to YYYY-MM-DD in local time
+  const dateString = currentDate.toLocaleDateString('en-CA');
+
+  const [yesterdayClasses, setYesterdayClasses, init1] = useFirestoreData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid, dateString);
+  const [yesterdayMedia, setYesterdayMedia, init2] = useFirestoreData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid, dateString);
+  const [todayClasses, setTodayClasses, init3] = useFirestoreData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid, dateString);
+  const [agencyTracking, setAgencyTracking, init4] = useFirestoreData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid, dateString);
+  const [studentRegistrations, setStudentRegistrations, init5] = useFirestoreData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid, dateString);
+  const [classFormations, setClassFormations, init6] = useFirestoreData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid, dateString);
+  const [trialClasses, setTrialClasses, init7] = useFirestoreData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid, dateString);
+  const [mediaOperations, setMediaOperations, init8] = useFirestoreData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid, dateString);
+  const [salesConversion, setSalesConversion, init9] = useFirestoreData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid, dateString);
+  const [financeRecords, setFinanceRecords, init10] = useFirestoreData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid, dateString);
+  const [offlineVisits, setOfflineVisits, init11] = useFirestoreData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid, dateString);
+  const [meetingRecords, setMeetingRecords, init16] = useFirestoreData<MeetingRecord[]>('meetingRecords', INITIAL_MEETING_RECORDS, user?.uid, dateString);
 
   const [redList, setRedList, init14] = useFirestoreData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
   const [bossInstructions, setBossInstructions, init15] = useFirestoreData<string[]>('bossInstructions', [], user?.uid);
+  const [todoList, setTodoList, init12] = useFirestoreData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid);
 
-  const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15;
+  const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15 && init16;
 
   const performanceData = [
     { name: 'Mon', value: 400 },
@@ -172,22 +179,7 @@ export default function App() {
   };
 
   const handleDelete = (type: string, id: string) => {
-    if (!window.confirm(t.confirmDelete)) return;
-    
-    switch (type) {
-      case 'yesterdayClass': setYesterdayClasses(prev => prev.filter(i => i.id !== id)); break;
-      case 'yesterdayMedia': setYesterdayMedia(prev => prev.filter(i => i.id !== id)); break;
-      case 'redList': setRedList(prev => prev.filter(i => i.id !== id)); break;
-      case 'todayClass': setTodayClasses(prev => prev.filter(i => i.id !== id)); break;
-      case 'agencyTracking': setAgencyTracking(prev => prev.filter(i => i.id !== id)); break;
-      case 'studentRegistration': setStudentRegistrations(prev => prev.filter(i => i.id !== id)); break;
-      case 'classFormation': setClassFormations(prev => prev.filter(i => i.id !== id)); break;
-      case 'trialClass': setTrialClasses(prev => prev.filter(i => i.id !== id)); break;
-      case 'mediaOperation': setMediaOperations(prev => prev.filter(i => i.id !== id)); break;
-      case 'financeRecord': setFinanceRecords(prev => prev.filter(i => i.id !== id)); break;
-      case 'offlineVisit': setOfflineVisits(prev => prev.filter(i => i.id !== id)); break;
-      case 'todoItem': setTodoList(prev => prev.filter(i => i.id !== id)); break;
-    }
+    openModal('confirmDelete', t.confirmDelete, { type, id });
   };
 
   const toggleTodoStatus = (id: string) => {
@@ -369,6 +361,36 @@ export default function App() {
     } else if (modalConfig.type === 'collaboration') {
       const newItem = { task: data.task as string, from: data.from as Employee, to: data.to as Employee };
       setSalesConversion(prev => ({ ...prev, collaborations: [...prev.collaborations, newItem] }));
+    } else if (modalConfig.type === 'meetingRecord') {
+      const newItem = {
+        id: modalConfig.isEdit ? modalConfig.data.id : Math.random().toString(36).substr(2, 9),
+        date: data.date as string,
+        title: data.title as string,
+        attendees: data.attendees as string,
+        content: data.content as string,
+      };
+      if (modalConfig.isEdit) {
+        setMeetingRecords(prev => prev.map(i => i.id === newItem.id ? newItem : i));
+      } else {
+        setMeetingRecords(prev => [...prev, newItem]);
+      }
+    } else if (modalConfig.type === 'confirmDelete') {
+      const { type, id } = modalConfig.data;
+      switch (type) {
+        case 'yesterdayClass': setYesterdayClasses(prev => prev.filter(i => i.id !== id)); break;
+        case 'yesterdayMedia': setYesterdayMedia(prev => prev.filter(i => i.id !== id)); break;
+        case 'redList': setRedList(prev => prev.filter(i => i.id !== id)); break;
+        case 'todayClass': setTodayClasses(prev => prev.filter(i => i.id !== id)); break;
+        case 'agencyTracking': setAgencyTracking(prev => prev.filter(i => i.id !== id)); break;
+        case 'studentRegistration': setStudentRegistrations(prev => prev.filter(i => i.id !== id)); break;
+        case 'classFormation': setClassFormations(prev => prev.filter(i => i.id !== id)); break;
+        case 'trialClass': setTrialClasses(prev => prev.filter(i => i.id !== id)); break;
+        case 'mediaOperation': setMediaOperations(prev => prev.filter(i => i.id !== id)); break;
+        case 'financeRecord': setFinanceRecords(prev => prev.filter(i => i.id !== id)); break;
+        case 'offlineVisit': setOfflineVisits(prev => prev.filter(i => i.id !== id)); break;
+        case 'todoItem': setTodoList(prev => prev.filter(i => i.id !== id)); break;
+        case 'meetingRecord': setMeetingRecords(prev => prev.filter(i => i.id !== id)); break;
+      }
     } else if (modalConfig.type === 'clearAll') {
       setYesterdayClasses([]);
       setYesterdayMedia([]);
@@ -385,6 +407,7 @@ export default function App() {
       setCooperationNote('');
       setRedList([]);
       setBossInstructions([]);
+      setMeetingRecords([]);
     }
 
     closeModal();
@@ -400,7 +423,7 @@ export default function App() {
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Dashboard Data");
-      XLSX.writeFile(wb, `Dali_Education_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(wb, `Dali_Education_Report_${dateString}.xlsx`);
     } catch (error) {
       console.error('Excel Export Error:', error);
       alert('Excel 导出失败，请重试');
@@ -422,7 +445,7 @@ export default function App() {
           <div className="w-16 h-16 bg-blue-100 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-6">
             <Users className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 mb-2">{t.brandName}</h1>
+          <h1 className="text-3xl font-serif font-bold text-slate-900 mb-2">{t.brandName}</h1>
           <p className="text-slate-500 mb-8 font-medium">{t.systemName}</p>
           
           <form onSubmit={handleAuth} className="space-y-4 text-left">
@@ -477,7 +500,7 @@ export default function App() {
       <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-6">
           <div className="flex flex-col leading-tight">
-            <h1 className="text-xl font-black tracking-tight text-slate-900 whitespace-nowrap">
+            <h1 className="text-2xl font-serif font-bold tracking-tight text-slate-900 whitespace-nowrap">
               {t.brandName}
             </h1>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">
@@ -498,7 +521,7 @@ export default function App() {
               </span>
               <input 
                 type="date" 
-                value={currentDate.toISOString().split('T')[0]}
+                value={dateString}
                 onChange={(e) => {
                   const [year, month, day] = e.target.value.split('-').map(Number);
                   setCurrentDate(new Date(year, month - 1, day));
@@ -582,7 +605,7 @@ export default function App() {
       <div className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex items-center gap-6">
         <div className="flex items-center gap-3 bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg shrink-0">
           <Bell className="w-5 h-5 text-amber-500" />
-          <span className="text-sm font-black uppercase tracking-[0.2em] text-amber-500">{t.bossInstructions}</span>
+          <span className="text-sm font-bold uppercase tracking-[0.2em] text-amber-500">{t.bossInstructions}</span>
         </div>
         <div className="flex-1 flex flex-wrap gap-x-8 gap-y-2">
           {bossInstructions.map((instruction, idx) => (
@@ -649,7 +672,7 @@ export default function App() {
                 {yesterdayMedia.map(media => (
                   <div key={media.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 relative group">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-black text-brand-blue bg-blue-50 px-2 py-1 rounded uppercase">
+                      <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded uppercase">
                         {media.platform}
                       </span>
                       <span className="text-[10px] font-bold text-slate-700">{media.accountName}</span>
@@ -681,14 +704,14 @@ export default function App() {
                   )}>
                     <div className="flex items-center justify-between">
                       <span className={cn(
-                        "text-[10px] font-black px-2 py-1 rounded uppercase",
+                        "text-[10px] font-bold px-2 py-1 rounded uppercase",
                         cls.type === '线上' ? "bg-brand-blue text-white" : "bg-brand-green text-white"
                       )}>
                         {cls.type === '线上' ? t.online : t.offline}
                       </span>
                       <span className="text-xs font-bold text-slate-500">{cls.time}</span>
                     </div>
-                    <h4 className="text-sm font-black text-slate-900">{cls.name}</h4>
+                    <h4 className="text-sm font-bold text-slate-900">{cls.name}</h4>
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1 text-slate-600">
                         <MapPin className="w-3 h-3" /> {cls.location}
@@ -712,7 +735,7 @@ export default function App() {
             {/* Red List Warning */}
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black text-brand-red flex items-center gap-2">
+                <h3 className="text-sm font-bold text-brand-red flex items-center gap-2">
                   <div className="w-1.5 h-4 bg-brand-red rounded-full" />
                   {t.redList}
                 </h3>
@@ -727,7 +750,7 @@ export default function App() {
                 {redList.map(item => (
                   <div key={item.id} className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between relative group">
                     <div>
-                      <div className="text-sm font-black text-red-900">{item.name}</div>
+                      <div className="text-sm font-bold text-red-900">{item.name}</div>
                       <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider">{item.reason}</div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -768,10 +791,10 @@ export default function App() {
                   <div key={assignee} className="flex flex-col gap-3 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-1">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-brand-blue-10 rounded-lg flex items-center justify-center text-brand-blue font-black text-xs">
+                        <div className="w-8 h-8 bg-brand-blue-10 rounded-lg flex items-center justify-center text-brand-blue font-bold text-xs">
                           {assignee.split(' ')[0][0]}
                         </div>
-                        <h4 className="text-sm font-black text-slate-900">
+                        <h4 className="text-sm font-bold text-slate-900">
                           {assignee}
                         </h4>
                       </div>
@@ -807,7 +830,7 @@ export default function App() {
                                 <button 
                                   onClick={() => toggleTodoStatus(item.id)}
                                   className={cn(
-                                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black transition-all",
+                                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all",
                                     item.isCompleted 
                                       ? "bg-green-100 text-brand-green" 
                                       : "bg-white text-slate-400 hover:bg-slate-100 border border-slate-100"
@@ -894,7 +917,7 @@ export default function App() {
                 {classFormations.map(item => (
                   <div key={item.id} className="p-3 bg-yellow-50 rounded-xl border border-yellow-200 relative group">
                     <div className="text-sm font-bold text-slate-800 mb-1">{item.title}</div>
-                    <div className="text-xs font-black text-brand-yellow">{item.status}</div>
+                    <div className="text-xs font-bold text-brand-yellow">{item.status}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openModal('classFormation', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
                       <button onClick={() => handleDelete('classFormation', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
@@ -938,7 +961,7 @@ export default function App() {
                     <h4 className="text-sm font-bold text-slate-800 mb-2">{t.content}：{op.content}</h4>
                     <div className="flex flex-wrap gap-2">
                       {op.platforms.map(p => (
-                        <span key={p} className="text-[10px] font-black bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-600">
+                        <span key={p} className="text-[10px] font-bold bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-600">
                           {p}
                         </span>
                       ))}
@@ -1024,8 +1047,8 @@ export default function App() {
                   {record.type === '应收款' ? <AlertCircle className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                 </div>
                 <div>
-                  <div className="text-[10px] font-black text-slate-400 uppercase">{record.type === '应收款' ? t.receivable : t.invoice}</div>
-                  <div className="text-lg font-black text-slate-900">¥{record.amount}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">{record.type === '应收款' ? t.receivable : t.invoice}</div>
+                  <div className="text-lg font-bold text-slate-900">¥{record.amount}</div>
                   <div className="text-[10px] text-slate-500">{record.detail}</div>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1109,7 +1132,7 @@ export default function App() {
             {offlineVisits.map(visit => (
               <div key={visit.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm relative group">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-black text-slate-900">{visit.visitor}</span>
+                  <span className="text-sm font-bold text-slate-900">{visit.visitor}</span>
                   <span className="text-xs font-bold text-brand-blue">{visit.time}</span>
                 </div>
                 <p className="text-xs text-slate-500">{t.purposeLabel}{visit.purpose}</p>
@@ -1128,6 +1151,45 @@ export default function App() {
             </button>
           </div>
         </SectionBlock>
+
+        {/* Section 9: Meeting Records */}
+        <SectionBlock title={t.meetingRecords} icon={<FileText className="w-6 h-6" />}>
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-end">
+              <button 
+                onClick={() => openModal('meetingRecord', t.addRecord)}
+                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-all shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" /> {t.addRecord}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {meetingRecords.map(record => (
+                <div key={record.id} className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm relative group hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md">{record.date}</span>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openModal('meetingRecord', t.editRecord, record, true)} className="p-1.5 bg-slate-50 rounded-lg hover:text-brand-blue transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDelete('meetingRecord', record.id)} className="p-1.5 bg-slate-50 rounded-lg hover:text-brand-red transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900 mb-2">{record.title}</h4>
+                  <div className="text-xs text-slate-500 mb-4 whitespace-pre-wrap line-clamp-4">{record.content}</div>
+                  <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-600">{record.attendees}</span>
+                  </div>
+                </div>
+              ))}
+              {meetingRecords.length === 0 && (
+                <div className="col-span-full flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400">
+                  <FileText className="w-8 h-8 mb-3 opacity-50" />
+                  <p className="text-sm font-bold">{t.noTasks}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </SectionBlock>
       </main>
 
       {/* Modal */}
@@ -1139,7 +1201,7 @@ export default function App() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
           >
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="text-lg font-black text-slate-900">{modalConfig.title}</h3>
+              <h3 className="text-xl font-serif font-bold text-slate-900">{modalConfig.title}</h3>
               <button onClick={closeModal} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -1258,9 +1320,30 @@ export default function App() {
                   <Select label={t.to} name="to" options={EMPLOYEES} />
                 </>
               )}
+              {modalConfig.type === 'meetingRecord' && (
+                <>
+                  <Input label={t.date} name="date" type="date" required />
+                  <Input label={t.meetingTitle} name="title" required />
+                  <Input label={t.attendees} name="attendees" required />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t.meetingContent}</label>
+                    <textarea 
+                      name="content" 
+                      defaultValue={modalConfig.data?.content || ''}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-30 focus:bg-white transition-all h-32 resize-none"
+                      required
+                    />
+                  </div>
+                </>
+              )}
               {modalConfig.type === 'clearAll' && (
                 <div className="py-4 text-center text-slate-700 font-medium">
                   {t.confirmClearAll}
+                </div>
+              )}
+              {modalConfig.type === 'confirmDelete' && (
+                <div className="py-4 text-center text-slate-700 font-medium">
+                  {t.confirmDelete}
                 </div>
               )}
 
@@ -1276,12 +1359,12 @@ export default function App() {
                   type="submit"
                   className={cn(
                     "flex-1 px-4 py-2.5 text-white rounded-xl font-bold transition-colors shadow-lg",
-                    modalConfig.type === 'clearAll' 
+                    (modalConfig.type === 'clearAll' || modalConfig.type === 'confirmDelete')
                       ? "bg-red-600 hover:bg-red-700" 
                       : "bg-brand-blue hover:bg-blue-600"
                   )}
                 >
-                  {modalConfig.type === 'clearAll' ? t.clearAll : t.save}
+                  {modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : t.save}
                 </button>
               </div>
             </form>
@@ -1292,7 +1375,7 @@ export default function App() {
       {/* Footer / Employee List */}
       <footer className="bg-slate-900 text-white p-8 mt-12">
         <div className="max-w-[1600px] mx-auto">
-          <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
             <Users className="w-4 h-4" /> {t.teamMembers}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
@@ -1350,7 +1433,7 @@ function SubSection({ title, children, onAdd }: SubSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
           <div className="w-1.5 h-4 bg-brand-blue rounded-full" />
           {title}
         </h3>
@@ -1371,11 +1454,12 @@ function SubSection({ title, children, onAdd }: SubSectionProps) {
 }
 
 // Form Components
-function Input({ label, name, defaultValue, required, placeholder }: { label: string; name: string; defaultValue?: string; required?: boolean; placeholder?: string }) {
+function Input({ label, name, defaultValue, required, placeholder, type = "text" }: { label: string; name: string; defaultValue?: string; required?: boolean; placeholder?: string; type?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-bold text-slate-500">{label}</label>
       <input 
+        type={type}
         name={name}
         defaultValue={defaultValue}
         required={required}

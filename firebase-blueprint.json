@@ -21,14 +21,15 @@
         "cooperationNote": { "type": "string" },
         "redList": { "type": "string" },
         "bossInstructions": { "type": "string" },
+        "meetingRecords": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     }
   },
   "firestore": {
-    "/shared/dashboard": {
+    "/shared/{docId}": {
       "schema": { "$ref": "#/entities/SharedDashboard" },
-      "description": "The single shared document containing all dashboard data for internal users"
+      "description": "The shared documents containing dashboard data for internal users. The docId is either 'dashboard' for ongoing items or 'dashboard_YYYY-MM-DD' for daily items."
     }
   }
 }

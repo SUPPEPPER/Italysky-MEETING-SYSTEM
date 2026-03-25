@@ -66,6 +66,11 @@ export const translations = {
     isCompleted: '是否已完成',
     
     // New
+    meetingRecords: '每周会议记录',
+    date: '日期',
+    attendees: '参会人员',
+    meetingTitle: '会议主题',
+    meetingContent: '会议内容',
     redList: '红名单预警',
     bossInstructions: '老板指令',
     exportPDF: '导出 PDF',
@@ -168,6 +173,11 @@ export const translations = {
     isCompleted: 'È completato?',
     
     // New
+    meetingRecords: 'Verbali delle Riunioni Settimanali',
+    date: 'Data',
+    attendees: 'Partecipanti',
+    meetingTitle: 'Oggetto',
+    meetingContent: 'Contenuto della Riunione',
     redList: 'Allerta Lista Rossa',
     bossInstructions: 'Istruzioni del Capo',
     exportPDF: 'Esporta PDF',

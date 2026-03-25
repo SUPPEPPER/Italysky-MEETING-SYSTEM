@@ -25,6 +25,7 @@ service cloud.firestore {
     //   - cooperationNote: string (optional)
     //   - redList: string (optional)
     //   - bossInstructions: string (optional)
+    //   - meetingRecords: string (optional)
     //   - updatedAt: timestamp (optional)
     //
     // ===============================================================
@@ -64,12 +65,13 @@ service cloud.firestore {
              isValidOptionalString('cooperationNote', 0, 100000) &&
              isValidOptionalString('redList', 0, 100000) &&
              isValidOptionalString('bossInstructions', 0, 100000) &&
+             isValidOptionalString('meetingRecords', 0, 100000) &&
              (!( 'updatedAt' in request.resource.data ) || request.resource.data.updatedAt is timestamp);
     }
 
-    match /shared/dashboard {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidUserDashboard();
+    match /shared/{docId} {
+      allow read: if isAuthenticated() && (docId == 'dashboard' || docId.matches('^dashboard_[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+      allow create, update: if isAuthenticated() && (docId == 'dashboard' || docId.matches('^dashboard_[0-9]{4}-[0-9]{2}-[0-9]{2}$')) && isValidUserDashboard();
     }
   }
 }

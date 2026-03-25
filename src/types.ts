@@ -97,3 +97,11 @@ export interface ToDoItem {
   isCompleted: boolean;
   remarks: string;
 }
+
+export interface MeetingRecord {
+  id: string;
+  date: string;
+  title: string;
+  content: string;
+  attendees: string;
+}

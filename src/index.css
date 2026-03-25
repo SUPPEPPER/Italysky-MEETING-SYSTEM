@@ -1,60 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  /* Use hex colors to avoid oklch parsing issues with html2canvas */
-  --color-brand-red: #ef4444;
-  --color-brand-yellow: #f59e0b;
-  --color-brand-blue: #3b82f6;
-  --color-brand-green: #10b981;
+  /* Loro Piana Vicuña (Camel) as primary brand color */
+  --color-brand-red: #8B3A3A; /* Muted Burgundy */
+  --color-brand-yellow: #C19A6B; /* Camel */
+  --color-brand-blue: #A37B5E; /* Vicuña */
+  --color-brand-green: #5A6B5D; /* Olive/Forest */
   
-  --color-slate-50: #f8fafc;
-  --color-slate-100: #f1f5f9;
-  --color-slate-200: #e2e8f0;
-  --color-slate-300: #cbd5e1;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
-  --color-slate-800: #1e293b;
-  --color-slate-900: #0f172a;
+  /* Warm Cashmere/Stone palette replacing cool slates */
+  --color-slate-50: #FAF9F6;
+  --color-slate-100: #F3EFEA;
+  --color-slate-200: #E6DFD5;
+  --color-slate-300: #D4C9BD;
+  --color-slate-400: #B5A89A;
+  --color-slate-500: #948677;
+  --color-slate-600: #736658;
+  --color-slate-700: #52473D;
+  --color-slate-800: #3B322A;
+  --color-slate-900: #261F1A;
 
-  --color-blue-50: #eff6ff;
-  --color-blue-100: #dbeafe;
-  --color-blue-200: #bfdbfe;
-  --color-blue-600: #2563eb;
+  /* Caramel variants replacing bright blues */
+  --color-blue-50: #FDFBF7;
+  --color-blue-100: #F6EFE9;
+  --color-blue-200: #E8D8C8;
+  --color-blue-600: #8A6246;
 
-  --color-green-50: #f0fdf4;
-  --color-green-100: #dcfce7;
-  --color-green-200: #bbf7d0;
-  --color-green-600: #16a34a;
+  /* Muted greens */
+  --color-green-50: #F4F6F4;
+  --color-green-100: #E3E8E4;
+  --color-green-200: #C5D0C7;
+  --color-green-500: #5A6B5D;
+  --color-green-600: #4A594D;
+  --color-green-700: #3B473D;
+  --color-green-900: #1D231E;
 
-  --color-yellow-50: #fffbeb;
-  --color-yellow-100: #fef3c7;
-  --color-yellow-200: #fde68a;
-  --color-yellow-600: #d97706;
+  /* Warm ambers */
+  --color-yellow-50: #FDFCF8;
+  --color-yellow-100: #F9F6EB;
+  --color-yellow-200: #F0E6CD;
+  --color-yellow-500: #C19A6B;
+  --color-yellow-600: #B08D55;
+  --color-yellow-700: #8B6B3D;
+  --color-yellow-900: #4A3A21;
 
-  --color-red-50: #fef2f2;
-  --color-red-100: #fee2e2;
+  /* Soft burgundies */
+  --color-red-50: #FBF7F7;
+  --color-red-100: #F3EAEB;
+  --color-red-200: #E6D5D5;
+  --color-red-500: #8B3A3A;
+  --color-red-600: #733030;
+  --color-red-700: #5C2626;
+  --color-red-900: #2E1313;
 
-  --color-amber-50: #fffbeb;
-  --color-amber-100: #fef3c7;
-  --color-amber-200: #fde68a;
-  --color-amber-500: #f59e0b;
-  --color-amber-600: #d97706;
+  --color-amber-50: #FDFCF8;
+  --color-amber-100: #F9F6EB;
+  --color-amber-200: #F0E6CD;
+  --color-amber-500: #C19A6B;
+  --color-amber-600: #B08D55;
 
-  /* Alpha variants to avoid oklab color-mix in Tailwind v4 */
-  --color-brand-blue-10: rgba(59, 130, 246, 0.1);
-  --color-brand-blue-20: rgba(59, 130, 246, 0.2);
-  --color-brand-blue-30: rgba(59, 130, 246, 0.3);
-  --color-brand-red-10: rgba(239, 68, 68, 0.1);
-  --color-slate-50-50: rgba(248, 250, 252, 0.5);
-  --color-slate-800-10: rgba(30, 41, 59, 0.1);
-  --color-slate-900-60: rgba(15, 23, 42, 0.6);
-  --color-amber-500-10: rgba(245, 158, 11, 0.1);
-  --color-amber-500-20: rgba(245, 158, 11, 0.2);
+  /* Alpha variants for Vicuña */
+  --color-brand-blue-10: rgba(163, 123, 94, 0.1);
+  --color-brand-blue-20: rgba(163, 123, 94, 0.2);
+  --color-brand-blue-30: rgba(163, 123, 94, 0.3);
+  --color-brand-red-10: rgba(139, 58, 58, 0.1);
+  --color-slate-50-50: rgba(250, 249, 246, 0.5);
+  --color-slate-800-10: rgba(59, 50, 42, 0.1);
+  --color-slate-900-60: rgba(38, 31, 26, 0.6);
+  --color-amber-500-10: rgba(193, 154, 107, 0.1);
+  --color-amber-500-20: rgba(193, 154, 107, 0.2);
   --color-white-5: rgba(255, 255, 255, 0.05);
   --color-white-10: rgba(255, 255, 255, 0.1);
   --color-white-50: rgba(255, 255, 255, 0.5);
@@ -74,6 +92,14 @@
   body {
     @apply bg-slate-50 text-slate-900 font-sans antialiased;
   }
+  
+  /* Soften the heaviest font weights for a more luxurious feel */
+  .font-black {
+    font-weight: 700 !important;
+  }
+  .font-extrabold {
+    font-weight: 600 !important;
+  }
 }
 
 .glass-card {
@@ -81,7 +107,7 @@
 }
 
 .section-header {
-  @apply bg-slate-800 text-white px-6 py-3 font-bold text-lg flex items-center gap-2;
+  @apply bg-slate-900 text-slate-50 px-6 py-4 font-serif font-medium tracking-wide text-xl flex items-center gap-3;
 }
 
 .content-grid {
