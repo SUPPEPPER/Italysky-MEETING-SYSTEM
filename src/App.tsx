@@ -76,31 +76,32 @@ import {
   INITIAL_OFFLINE_VISITS
 } from './constants';
 import { Language, translations } from './translations';
+import { useLocalStorage } from './hooks/useLocalStorage';
 
 export default function App() {
   const dashboardRef = useRef<HTMLDivElement>(null);
   
   // State
-  const [lang, setLang] = useState<Language>('zh');
+  const [lang, setLang] = useLocalStorage<Language>('dali_lang', 'zh');
   const t = translations[lang];
 
-  const [yesterdayClasses, setYesterdayClasses] = useState<YesterdayClass[]>(INITIAL_YESTERDAY_CLASSES);
-  const [yesterdayMedia, setYesterdayMedia] = useState<MediaRecord[]>(INITIAL_YESTERDAY_MEDIA);
-  const [todayClasses, setTodayClasses] = useState<TodayClass[]>(INITIAL_TODAY_CLASSES);
-  const [agencyTracking, setAgencyTracking] = useState<AgencyTracking[]>(INITIAL_AGENCY_TRACKING);
-  const [studentRegistrations, setStudentRegistrations] = useState<StudentRegistration[]>(INITIAL_STUDENT_REGISTRATIONS);
-  const [classFormations, setClassFormations] = useState<ClassFormation[]>(INITIAL_CLASS_FORMATIONS);
-  const [trialClasses, setTrialClasses] = useState<TrialClass[]>(INITIAL_TRIAL_CLASSES);
-  const [mediaOperations, setMediaOperations] = useState<MediaOperation[]>(INITIAL_MEDIA_OPERATIONS);
-  const [salesConversion, setSalesConversion] = useState<SalesConversion>(INITIAL_SALES_CONVERSION);
-  const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>(INITIAL_FINANCE_RECORDS);
-  const [offlineVisits, setOfflineVisits] = useState<OfflineVisit[]>(INITIAL_OFFLINE_VISITS);
-  const [todoList, setTodoList] = useState<ToDoItem[]>(INITIAL_TODO_LIST);
-  const [cooperationNote, setCooperationNote] = useState('');
+  const [yesterdayClasses, setYesterdayClasses] = useLocalStorage<YesterdayClass[]>('dali_yesterdayClasses', INITIAL_YESTERDAY_CLASSES);
+  const [yesterdayMedia, setYesterdayMedia] = useLocalStorage<MediaRecord[]>('dali_yesterdayMedia', INITIAL_YESTERDAY_MEDIA);
+  const [todayClasses, setTodayClasses] = useLocalStorage<TodayClass[]>('dali_todayClasses', INITIAL_TODAY_CLASSES);
+  const [agencyTracking, setAgencyTracking] = useLocalStorage<AgencyTracking[]>('dali_agencyTracking', INITIAL_AGENCY_TRACKING);
+  const [studentRegistrations, setStudentRegistrations] = useLocalStorage<StudentRegistration[]>('dali_studentRegistrations', INITIAL_STUDENT_REGISTRATIONS);
+  const [classFormations, setClassFormations] = useLocalStorage<ClassFormation[]>('dali_classFormations', INITIAL_CLASS_FORMATIONS);
+  const [trialClasses, setTrialClasses] = useLocalStorage<TrialClass[]>('dali_trialClasses', INITIAL_TRIAL_CLASSES);
+  const [mediaOperations, setMediaOperations] = useLocalStorage<MediaOperation[]>('dali_mediaOperations', INITIAL_MEDIA_OPERATIONS);
+  const [salesConversion, setSalesConversion] = useLocalStorage<SalesConversion>('dali_salesConversion', INITIAL_SALES_CONVERSION);
+  const [financeRecords, setFinanceRecords] = useLocalStorage<FinanceRecord[]>('dali_financeRecords', INITIAL_FINANCE_RECORDS);
+  const [offlineVisits, setOfflineVisits] = useLocalStorage<OfflineVisit[]>('dali_offlineVisits', INITIAL_OFFLINE_VISITS);
+  const [todoList, setTodoList] = useLocalStorage<ToDoItem[]>('dali_todoList', INITIAL_TODO_LIST);
+  const [cooperationNote, setCooperationNote] = useLocalStorage('dali_cooperationNote', '');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const [redList, setRedList] = useState<{id: string, name: string, reason: string}[]>([]);
-  const [bossInstructions, setBossInstructions] = useState<string[]>([]);
+  const [redList, setRedList] = useLocalStorage<{id: string, name: string, reason: string}[]>('dali_redList', []);
+  const [bossInstructions, setBossInstructions] = useLocalStorage<string[]>('dali_bossInstructions', []);
 
   const performanceData = [
     { name: 'Mon', value: 400 },
