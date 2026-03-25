@@ -99,14 +99,8 @@ export default function App() {
   const [cooperationNote, setCooperationNote] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const [redList, setRedList] = useState<{id: string, name: string, reason: string}[]>([
-    { id: '1', name: '张三', reason: '连续三次未交作业' },
-    { id: '2', name: '李四', reason: '出勤率低于60%' }
-  ]);
-  const [bossInstructions, setBossInstructions] = useState<string[]>([
-    '本周重点关注米理申请截止日期',
-    '加强小红书内容的互动率'
-  ]);
+  const [redList, setRedList] = useState<{id: string, name: string, reason: string}[]>([]);
+  const [bossInstructions, setBossInstructions] = useState<string[]>([]);
 
   const performanceData = [
     { name: 'Mon', value: 400 },
