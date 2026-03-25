@@ -45,6 +45,7 @@ export const INITIAL_YESTERDAY_CLASSES: YesterdayClass[] = [
 export const INITIAL_YESTERDAY_MEDIA: MediaRecord[] = [
   { id: '1', platform: '小红书', accountName: '大梨教育A号', content: '米理申请攻略', data: '浏览1200, 赞45' },
   { id: '2', platform: '视频号', accountName: '意国蓝天', content: '上课日常', data: '播放500, 转发20' },
+  { id: '3', platform: '抖音', accountName: '意国蓝天官方', content: '留学生访谈', data: '播放2000, 赞150' },
 ];
 
 export const INITIAL_TODAY_CLASSES: TodayClass[] = [

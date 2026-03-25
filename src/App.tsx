@@ -145,6 +145,7 @@ export default function App() {
     switch (type) {
       case 'yesterdayClass': setYesterdayClasses(prev => prev.filter(i => i.id !== id)); break;
       case 'yesterdayMedia': setYesterdayMedia(prev => prev.filter(i => i.id !== id)); break;
+      case 'redList': setRedList(prev => prev.filter(i => i.id !== id)); break;
       case 'todayClass': setTodayClasses(prev => prev.filter(i => i.id !== id)); break;
       case 'agencyTracking': setAgencyTracking(prev => prev.filter(i => i.id !== id)); break;
       case 'studentRegistration': setStudentRegistrations(prev => prev.filter(i => i.id !== id)); break;
@@ -203,6 +204,17 @@ export default function App() {
         setYesterdayMedia(prev => prev.map(i => i.id === newItem.id ? newItem : i));
       } else {
         setYesterdayMedia(prev => [...prev, newItem]);
+      }
+    } else if (modalConfig.type === 'redList') {
+      const newItem = {
+        id: modalConfig.isEdit ? modalConfig.data.id : Math.random().toString(36).substr(2, 9),
+        name: data.name as string,
+        reason: data.reason as string,
+      };
+      if (modalConfig.isEdit) {
+        setRedList(prev => prev.map(i => i.id === newItem.id ? newItem : i));
+      } else {
+        setRedList(prev => [...prev, newItem]);
       }
     } else if (modalConfig.type === 'todayClass') {
       const newItem = {
@@ -333,20 +345,44 @@ export default function App() {
   const exportToPDF = async () => {
     try {
       if (!dashboardRef.current) return;
-      const canvas = await html2canvas(dashboardRef.current, {
+      
+      // Add class to root element to disable problematic styles
+      const dashboard = dashboardRef.current;
+      dashboard.classList.add('pdf-capture');
+      
+      const canvas = await html2canvas(dashboard, {
         scale: 2,
         useCORS: true,
         logging: false,
+        backgroundColor: '#f8fafc', // Match bg-slate-50
+        onclone: (clonedDoc) => {
+          // Additional cleanup on cloned document if needed
+          const clonedDashboard = clonedDoc.querySelector('.pdf-capture');
+          if (clonedDashboard) {
+            // Force some styles if needed
+          }
+        }
       });
+      
+      // Remove class after capture
+      dashboard.classList.remove('pdf-capture');
+      
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      // If height is more than one page, we might need multiple pages
+      // but for now let's just scale it to one page width
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`意国蓝天-会议纪要-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('PDF Export Error:', error);
+      // Ensure class is removed even on error
+      if (dashboardRef.current) {
+        dashboardRef.current.classList.remove('pdf-capture');
+      }
       alert('PDF 导出失败，请重试');
     }
   };
@@ -443,14 +479,14 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button
               onClick={exportToPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 rounded-xl text-sm font-bold transition-all shadow-lg shadow-slate-200"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 rounded-xl text-sm font-bold transition-all shadow-lg"
             >
               <FileDown className="w-4 h-4" />
               {t.exportPDF}
             </button>
             <button
               onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-bold transition-all shadow-lg shadow-green-100"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-bold transition-all shadow-lg"
             >
               <FileSpreadsheet className="w-4 h-4" />
               {t.exportExcel}
@@ -495,7 +531,7 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {yesterdayClasses.map(cls => (
-                      <tr key={cls.id} className="hover:bg-slate-50/50 group">
+                      <tr key={cls.id} className="hover:bg-slate-50 group">
                         <td className="px-4 py-3 font-bold text-slate-800">{cls.name}</td>
                         <td className="px-4 py-3 text-slate-600">{cls.teacher}</td>
                         <td className="px-4 py-3">
@@ -533,7 +569,7 @@ export default function App() {
                       <span className="text-xs font-black text-brand-blue bg-blue-50 px-2 py-1 rounded uppercase">
                         {media.platform}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400">{media.accountName}</span>
+                      <span className="text-[10px] font-bold text-slate-700">{media.accountName}</span>
                     </div>
                     <p className="text-sm font-bold text-slate-800 mb-2">{media.content}</p>
                     <div className="text-xs text-slate-500 font-mono bg-white p-2 rounded border border-slate-100">
@@ -592,19 +628,33 @@ export default function App() {
 
             {/* Red List Warning */}
             <div className="flex flex-col gap-4">
-              <h3 className="text-sm font-black text-brand-red flex items-center gap-2">
-                <div className="w-1.5 h-4 bg-brand-red rounded-full" />
-                {t.redList}
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-brand-red flex items-center gap-2">
+                  <div className="w-1.5 h-4 bg-brand-red rounded-full" />
+                  {t.redList}
+                </h3>
+                <button 
+                  onClick={() => openModal('redList', t.addRecord)}
+                  className="p-1.5 bg-red-50 text-brand-red rounded-lg hover:bg-red-100 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
               <div className="space-y-3">
                 {redList.map(item => (
-                  <div key={item.id} className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between">
+                  <div key={item.id} className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between relative group">
                     <div>
                       <div className="text-sm font-black text-red-900">{item.name}</div>
                       <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider">{item.reason}</div>
                     </div>
-                    <div className="p-2 bg-white rounded-lg shadow-sm text-brand-red">
-                      <AlertCircle className="w-4 h-4" />
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-white rounded-lg shadow-sm text-brand-red group-hover:opacity-0 transition-opacity">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                      <div className="absolute right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => openModal('redList', t.editRecord, item, true)} className="p-1.5 bg-white rounded-lg shadow-sm hover:text-brand-blue"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDelete('redList', item.id)} className="p-1.5 bg-white rounded-lg shadow-sm hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -918,7 +968,7 @@ export default function App() {
               value={cooperationNote}
               onChange={(e) => setCooperationNote(e.target.value)}
               placeholder={t.cooperationPlaceholder}
-              className="w-full h-32 p-4 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800/10 transition-all resize-none"
+              className="w-full h-32 p-4 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800-10 transition-all resize-none"
             />
           </SectionBlock>
 
@@ -942,7 +992,7 @@ export default function App() {
                   id="new-instruction"
                   type="text" 
                   placeholder={lang === 'zh' ? "输入新指令..." : "Inserisci nuova istruzione..."}
-                  className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800/10"
+                  className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800-10"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const val = (e.target as HTMLInputElement).value;
@@ -1023,10 +1073,16 @@ export default function App() {
               )}
               {modalConfig.type === 'yesterdayMedia' && (
                 <>
-                  <Select label={t.platform} name="platform" options={['小红书', '视频号', '公众号']} defaultValue={modalConfig.data?.platform} />
+                  <Select label={t.platform} name="platform" options={['小红书', '视频号', '公众号', '抖音']} defaultValue={modalConfig.data?.platform} />
                   <Input label={t.accountName} name="accountName" defaultValue={modalConfig.data?.accountName} required />
                   <Input label={t.content} name="content" defaultValue={modalConfig.data?.content} required />
                   <Input label={t.data} name="data" defaultValue={modalConfig.data?.data} placeholder={lang === 'zh' ? "如：点赞 100, 收藏 50" : "es: Like 100, Preferiti 50"} />
+                </>
+              )}
+              {modalConfig.type === 'redList' && (
+                <>
+                  <Input label={t.student} name="name" defaultValue={modalConfig.data?.name} required />
+                  <Input label={t.remarks} name="reason" defaultValue={modalConfig.data?.reason} required />
                 </>
               )}
               {modalConfig.type === 'todayClass' && (
@@ -1130,7 +1186,7 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-brand-blue text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-200"
+                  className="flex-1 px-4 py-2.5 bg-brand-blue text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg"
                 >
                   {t.save}
                 </button>

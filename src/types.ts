@@ -19,7 +19,7 @@ export interface YesterdayClass {
 
 export interface MediaRecord {
   id: string;
-  platform: '小红书' | '视频号' | '公众号';
+  platform: '小红书' | '视频号' | '公众号' | '抖音';
   accountName: string;
   content: string;
   data: string;
