@@ -71,6 +71,7 @@ export const translations = {
     exportPDF: '导出 PDF',
     exportExcel: '导出 Excel',
     dataPerformance: '数据表现趋势',
+    printHint: '提示：按 Command + P 导出 PDF',
     
     // Buttons
     add: '新增',
@@ -170,6 +171,7 @@ export const translations = {
     exportPDF: 'Esporta PDF',
     exportExcel: 'Esporta Excel',
     dataPerformance: 'Andamento Performance Dati',
+    printHint: 'Suggerimento: Premi Command + P per esportare in PDF',
     
     // Buttons
     add: 'Aggiungi',

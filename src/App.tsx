@@ -31,8 +31,6 @@ import {
   FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import { 
   LineChart, 
@@ -342,51 +340,6 @@ export default function App() {
     closeModal();
   };
 
-  const exportToPDF = async () => {
-    try {
-      if (!dashboardRef.current) return;
-      
-      // Add class to root element to disable problematic styles
-      const dashboard = dashboardRef.current;
-      dashboard.classList.add('pdf-capture');
-      
-      const canvas = await html2canvas(dashboard, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#f8fafc', // Match bg-slate-50
-        onclone: (clonedDoc) => {
-          // Additional cleanup on cloned document if needed
-          const clonedDashboard = clonedDoc.querySelector('.pdf-capture');
-          if (clonedDashboard) {
-            // Force some styles if needed
-          }
-        }
-      });
-      
-      // Remove class after capture
-      dashboard.classList.remove('pdf-capture');
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      // If height is more than one page, we might need multiple pages
-      // but for now let's just scale it to one page width
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`意国蓝天-会议纪要-${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (error) {
-      console.error('PDF Export Error:', error);
-      // Ensure class is removed even on error
-      if (dashboardRef.current) {
-        dashboardRef.current.classList.remove('pdf-capture');
-      }
-      alert('PDF 导出失败，请重试');
-    }
-  };
-
   const exportToExcel = () => {
     try {
       const data = [
@@ -476,14 +429,10 @@ export default function App() {
             </button>
           </div>
           
-          <div className="flex items-center gap-2">
-            <button
-              onClick={exportToPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white hover:bg-slate-700 rounded-xl text-sm font-bold transition-all shadow-lg"
-            >
-              <FileDown className="w-4 h-4" />
-              {t.exportPDF}
-            </button>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-400 hidden md:inline-block">
+              {t.printHint}
+            </span>
             <button
               onClick={exportToExcel}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-bold transition-all shadow-lg"
