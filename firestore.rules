@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: shared
+    // Document ID: dashboard
+    // Fields:
+    //   - lang: string (optional)
+    //   - yesterdayClasses: string (optional)
+    //   - yesterdayMedia: string (optional)
+    //   - todayClasses: string (optional)
+    //   - agencyTracking: string (optional)
+    //   - studentRegistrations: string (optional)
+    //   - classFormations: string (optional)
+    //   - trialClasses: string (optional)
+    //   - mediaOperations: string (optional)
+    //   - salesConversion: string (optional)
+    //   - financeRecords: string (optional)
+    //   - offlineVisits: string (optional)
+    //   - todoList: string (optional)
+    //   - cooperationNote: string (optional)
+    //   - redList: string (optional)
+    //   - bossInstructions: string (optional)
+    //   - updatedAt: timestamp (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    // Check if the user is authenticated
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+    
+    // Validate optional string size
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    // Validate User Dashboard Data
+    function isValidUserDashboard() {
+      return isValidOptionalString('lang', 0, 10) &&
+             isValidOptionalString('yesterdayClasses', 0, 100000) &&
+             isValidOptionalString('yesterdayMedia', 0, 100000) &&
+             isValidOptionalString('todayClasses', 0, 100000) &&
+             isValidOptionalString('agencyTracking', 0, 100000) &&
+             isValidOptionalString('studentRegistrations', 0, 100000) &&
+             isValidOptionalString('classFormations', 0, 100000) &&
+             isValidOptionalString('trialClasses', 0, 100000) &&
+             isValidOptionalString('mediaOperations', 0, 100000) &&
+             isValidOptionalString('salesConversion', 0, 100000) &&
+             isValidOptionalString('financeRecords', 0, 100000) &&
+             isValidOptionalString('offlineVisits', 0, 100000) &&
+             isValidOptionalString('todoList', 0, 100000) &&
+             isValidOptionalString('cooperationNote', 0, 100000) &&
+             isValidOptionalString('redList', 0, 100000) &&
+             isValidOptionalString('bossInstructions', 0, 100000) &&
+             (!( 'updatedAt' in request.resource.data ) || request.resource.data.updatedAt is timestamp);
+    }
+
+    match /shared/dashboard {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidUserDashboard();
+    }
+  }
+}

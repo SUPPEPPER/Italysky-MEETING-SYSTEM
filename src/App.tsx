@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, 
   Download, 
@@ -28,7 +28,8 @@ import {
   Trash2,
   X,
   Bell,
-  FileDown
+  FileDown,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -44,6 +45,8 @@ import {
   Area
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
+import { auth } from './firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { 
   Employee,
   YesterdayClass,
@@ -76,32 +79,73 @@ import {
   INITIAL_OFFLINE_VISITS
 } from './constants';
 import { Language, translations } from './translations';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useFirestoreData } from './hooks/useFirestoreData';
 
 export default function App() {
   const dashboardRef = useRef<HTMLDivElement>(null);
   
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error: any) {
+      console.error("Auth failed", error);
+      setAuthError(error.message || 'Authentication failed');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
   // State
-  const [lang, setLang] = useLocalStorage<Language>('dali_lang', 'zh');
+  const [lang, setLang] = useFirestoreData<Language>('lang', 'zh', user?.uid);
   const t = translations[lang];
 
-  const [yesterdayClasses, setYesterdayClasses] = useLocalStorage<YesterdayClass[]>('dali_yesterdayClasses', INITIAL_YESTERDAY_CLASSES);
-  const [yesterdayMedia, setYesterdayMedia] = useLocalStorage<MediaRecord[]>('dali_yesterdayMedia', INITIAL_YESTERDAY_MEDIA);
-  const [todayClasses, setTodayClasses] = useLocalStorage<TodayClass[]>('dali_todayClasses', INITIAL_TODAY_CLASSES);
-  const [agencyTracking, setAgencyTracking] = useLocalStorage<AgencyTracking[]>('dali_agencyTracking', INITIAL_AGENCY_TRACKING);
-  const [studentRegistrations, setStudentRegistrations] = useLocalStorage<StudentRegistration[]>('dali_studentRegistrations', INITIAL_STUDENT_REGISTRATIONS);
-  const [classFormations, setClassFormations] = useLocalStorage<ClassFormation[]>('dali_classFormations', INITIAL_CLASS_FORMATIONS);
-  const [trialClasses, setTrialClasses] = useLocalStorage<TrialClass[]>('dali_trialClasses', INITIAL_TRIAL_CLASSES);
-  const [mediaOperations, setMediaOperations] = useLocalStorage<MediaOperation[]>('dali_mediaOperations', INITIAL_MEDIA_OPERATIONS);
-  const [salesConversion, setSalesConversion] = useLocalStorage<SalesConversion>('dali_salesConversion', INITIAL_SALES_CONVERSION);
-  const [financeRecords, setFinanceRecords] = useLocalStorage<FinanceRecord[]>('dali_financeRecords', INITIAL_FINANCE_RECORDS);
-  const [offlineVisits, setOfflineVisits] = useLocalStorage<OfflineVisit[]>('dali_offlineVisits', INITIAL_OFFLINE_VISITS);
-  const [todoList, setTodoList] = useLocalStorage<ToDoItem[]>('dali_todoList', INITIAL_TODO_LIST);
-  const [cooperationNote, setCooperationNote] = useLocalStorage('dali_cooperationNote', '');
+  const [yesterdayClasses, setYesterdayClasses, init1] = useFirestoreData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid);
+  const [yesterdayMedia, setYesterdayMedia, init2] = useFirestoreData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid);
+  const [todayClasses, setTodayClasses, init3] = useFirestoreData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid);
+  const [agencyTracking, setAgencyTracking, init4] = useFirestoreData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid);
+  const [studentRegistrations, setStudentRegistrations, init5] = useFirestoreData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid);
+  const [classFormations, setClassFormations, init6] = useFirestoreData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid);
+  const [trialClasses, setTrialClasses, init7] = useFirestoreData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid);
+  const [mediaOperations, setMediaOperations, init8] = useFirestoreData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid);
+  const [salesConversion, setSalesConversion, init9] = useFirestoreData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid);
+  const [financeRecords, setFinanceRecords, init10] = useFirestoreData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid);
+  const [offlineVisits, setOfflineVisits, init11] = useFirestoreData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid);
+  const [todoList, setTodoList, init12] = useFirestoreData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid);
+  const [cooperationNote, setCooperationNote, init13] = useFirestoreData('cooperationNote', '', user?.uid);
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const [redList, setRedList] = useLocalStorage<{id: string, name: string, reason: string}[]>('dali_redList', []);
-  const [bossInstructions, setBossInstructions] = useLocalStorage<string[]>('dali_bossInstructions', []);
+  const [redList, setRedList, init14] = useFirestoreData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
+  const [bossInstructions, setBossInstructions, init15] = useFirestoreData<string[]>('bossInstructions', [], user?.uid);
+
+  const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15;
 
   const performanceData = [
     { name: 'Mon', value: 400 },
@@ -368,6 +412,77 @@ export default function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-blue-100 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-6">
+            <Users className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 mb-2">{t.brandName}</h1>
+          <p className="text-slate-500 mb-8 font-medium">{t.systemName}</p>
+          
+          <form onSubmit={handleAuth} className="space-y-4 text-left">
+            {authError && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">
+                {authError}
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full py-3 px-4 bg-brand-blue text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg flex items-center justify-center gap-2"
+            >
+              {isRegistering ? 'Create Account' : 'Sign In'}
+            </button>
+          </form>
+          
+          <button 
+            onClick={() => setIsRegistering(!isRegistering)}
+            className="mt-6 text-sm text-slate-500 hover:text-brand-blue transition-colors"
+          >
+            {isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isDataLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans" ref={dashboardRef}>
       {/* Header */}
@@ -458,6 +573,19 @@ export default function App() {
               <FileSpreadsheet className="w-4 h-4" />
               {t.exportExcel}
             </button>
+            <div className="w-px h-6 bg-slate-200 mx-2"></div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-sm">
+                {user.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </header>

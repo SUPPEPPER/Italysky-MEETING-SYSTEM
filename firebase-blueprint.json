@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "SharedDashboard": {
+      "title": "SharedDashboard",
+      "description": "A shared dashboard for internal users",
+      "type": "object",
+      "properties": {
+        "lang": { "type": "string" },
+        "yesterdayClasses": { "type": "string" },
+        "yesterdayMedia": { "type": "string" },
+        "todayClasses": { "type": "string" },
+        "agencyTracking": { "type": "string" },
+        "studentRegistrations": { "type": "string" },
+        "classFormations": { "type": "string" },
+        "trialClasses": { "type": "string" },
+        "mediaOperations": { "type": "string" },
+        "salesConversion": { "type": "string" },
+        "financeRecords": { "type": "string" },
+        "offlineVisits": { "type": "string" },
+        "todoList": { "type": "string" },
+        "cooperationNote": { "type": "string" },
+        "redList": { "type": "string" },
+        "bossInstructions": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/shared/dashboard": {
+      "schema": { "$ref": "#/entities/SharedDashboard" },
+      "description": "The single shared document containing all dashboard data for internal users"
+    }
+  }
+}
