@@ -12,7 +12,7 @@ import {
   FinanceRecord,
   OfflineVisit,
   ToDoItem,
-  MeetingRecord
+  StudentExam
 } from './types';
 
 export const EMPLOYEES: Employee[] = [
@@ -61,4 +61,4 @@ export const INITIAL_FINANCE_RECORDS: FinanceRecord[] = [];
 
 export const INITIAL_OFFLINE_VISITS: OfflineVisit[] = [];
 
-export const INITIAL_MEETING_RECORDS: MeetingRecord[] = [];
+export const INITIAL_STUDENT_EXAMS: StudentExam[] = [];

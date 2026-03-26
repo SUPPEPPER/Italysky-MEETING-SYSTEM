@@ -98,10 +98,10 @@ export interface ToDoItem {
   remarks: string;
 }
 
-export interface MeetingRecord {
+export interface StudentExam {
   id: string;
+  student: string;
+  examName: string;
   date: string;
-  title: string;
-  content: string;
-  attendees: string;
+  score: string;
 }

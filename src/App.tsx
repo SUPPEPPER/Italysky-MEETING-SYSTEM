@@ -28,8 +28,7 @@ import {
   Trash2,
   X,
   Bell,
-  FileDown,
-  LogOut
+  FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -45,8 +44,7 @@ import {
   Area
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
-import { auth } from './firebase';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { useLocalStorageData } from './hooks/useLocalStorageData';
 import { 
   Employee,
   YesterdayClass,
@@ -61,7 +59,7 @@ import {
   FinanceRecord,
   OfflineVisit,
   ToDoItem,
-  MeetingRecord
+  StudentExam
 } from './types';
 import { 
   EMPLOYEES,
@@ -78,74 +76,69 @@ import {
   INITIAL_SALES_CONVERSION,
   INITIAL_FINANCE_RECORDS,
   INITIAL_OFFLINE_VISITS,
-  INITIAL_MEETING_RECORDS
+  INITIAL_STUDENT_EXAMS
 } from './constants';
 import { Language, translations } from './translations';
-import { useFirestoreData } from './hooks/useFirestoreData';
 
 export default function App() {
   const dashboardRef = useRef<HTMLDivElement>(null);
   
-  // Auth State
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      console.error("Auth failed", error);
-      setAuthError(error.message || 'Authentication failed');
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
-  };
-
   // State
-  const [lang, setLang] = useFirestoreData<Language>('lang', 'zh', user?.uid);
+  const [lang, setLang] = useLocalStorageData<Language>('lang', 'zh');
   const t = translations[lang];
 
-  const [cooperationNote, setCooperationNote, init13] = useFirestoreData('cooperationNote', '', user?.uid);
+  const [cooperationNote, setCooperationNote, init13] = useLocalStorageData('cooperationNote', '');
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // Format date to YYYY-MM-DD in local time
   const dateString = currentDate.toLocaleDateString('en-CA');
 
-  const [yesterdayClasses, setYesterdayClasses, init1] = useFirestoreData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid, dateString);
-  const [yesterdayMedia, setYesterdayMedia, init2] = useFirestoreData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid, dateString);
-  const [todayClasses, setTodayClasses, init3] = useFirestoreData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid, dateString);
-  const [agencyTracking, setAgencyTracking, init4] = useFirestoreData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid, dateString);
-  const [studentRegistrations, setStudentRegistrations, init5] = useFirestoreData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid, dateString);
-  const [classFormations, setClassFormations, init6] = useFirestoreData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid, dateString);
-  const [trialClasses, setTrialClasses, init7] = useFirestoreData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid, dateString);
-  const [mediaOperations, setMediaOperations, init8] = useFirestoreData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid, dateString);
-  const [salesConversion, setSalesConversion, init9] = useFirestoreData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid, dateString);
-  const [financeRecords, setFinanceRecords, init10] = useFirestoreData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid, dateString);
-  const [offlineVisits, setOfflineVisits, init11] = useFirestoreData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid, dateString);
-  const [meetingRecords, setMeetingRecords, init16] = useFirestoreData<MeetingRecord[]>('meetingRecords', INITIAL_MEETING_RECORDS, user?.uid, dateString);
+  const [yesterdayClasses, setYesterdayClasses, init1, docExists] = useLocalStorageData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, dateString);
+  const [yesterdayMedia, setYesterdayMedia, init2] = useLocalStorageData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, dateString);
+  const [todayClasses, setTodayClasses, init3] = useLocalStorageData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, dateString);
+  const [agencyTracking, setAgencyTracking, init4] = useLocalStorageData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, dateString);
+  const [studentRegistrations, setStudentRegistrations, init5] = useLocalStorageData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, dateString);
+  const [classFormations, setClassFormations, init6] = useLocalStorageData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, dateString);
+  const [trialClasses, setTrialClasses, init7] = useLocalStorageData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, dateString);
+  const [mediaOperations, setMediaOperations, init8] = useLocalStorageData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, dateString);
+  const [salesConversion, setSalesConversion, init9] = useLocalStorageData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, dateString);
+  const [financeRecords, setFinanceRecords, init10] = useLocalStorageData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS);
+  const [offlineVisits, setOfflineVisits, init11] = useLocalStorageData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, dateString);
+  const [studentExams, setStudentExams, init16] = useLocalStorageData<StudentExam[]>('studentExams', INITIAL_STUDENT_EXAMS, dateString);
 
-  const [redList, setRedList, init14] = useFirestoreData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
-  const [bossInstructions, setBossInstructions, init15] = useFirestoreData<string[]>('bossInstructions', [], user?.uid);
-  const [todoList, setTodoList, init12] = useFirestoreData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid);
+  const [redList, setRedList, init14] = useLocalStorageData<{id: string, name: string, reason: string}[]>('redList', []);
+  const [bossInstructions, setBossInstructions, init15] = useLocalStorageData<string[]>('bossInstructions', []);
+  const [todoList, setTodoList, init12] = useLocalStorageData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, dateString);
+
+  useEffect(() => {
+    if (init1 && !docExists) {
+      // Fetch yesterday's todayClasses
+      const yesterdayDate = new Date(currentDate);
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayDateString = yesterdayDate.toLocaleDateString('en-CA');
+      
+      const storageKey = `dashboard_${yesterdayDateString}_todayClasses`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.length > 0) {
+            // Map todayClasses to yesterdayClasses format
+            const mappedClasses = parsed.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              teacher: c.teacher,
+              feedbackCompleted: false,
+              remarks: c.remarks || ''
+            }));
+            setYesterdayClasses(mappedClasses);
+          }
+        } catch (e) {
+          console.error("Failed to parse yesterday's todayClasses", e);
+        }
+      }
+    }
+  }, [init1, docExists, currentDate, setYesterdayClasses]);
 
   const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15 && init16;
 
@@ -361,18 +354,18 @@ export default function App() {
     } else if (modalConfig.type === 'collaboration') {
       const newItem = { task: data.task as string, from: data.from as Employee, to: data.to as Employee };
       setSalesConversion(prev => ({ ...prev, collaborations: [...prev.collaborations, newItem] }));
-    } else if (modalConfig.type === 'meetingRecord') {
+    } else if (modalConfig.type === 'studentExam') {
       const newItem = {
         id: modalConfig.isEdit ? modalConfig.data.id : Math.random().toString(36).substr(2, 9),
         date: data.date as string,
-        title: data.title as string,
-        attendees: data.attendees as string,
-        content: data.content as string,
+        student: data.student as string,
+        examName: data.examName as string,
+        score: data.score as string,
       };
       if (modalConfig.isEdit) {
-        setMeetingRecords(prev => prev.map(i => i.id === newItem.id ? newItem : i));
+        setStudentExams(prev => prev.map(i => i.id === newItem.id ? newItem : i));
       } else {
-        setMeetingRecords(prev => [...prev, newItem]);
+        setStudentExams(prev => [...prev, newItem]);
       }
     } else if (modalConfig.type === 'confirmDelete') {
       const { type, id } = modalConfig.data;
@@ -389,7 +382,7 @@ export default function App() {
         case 'financeRecord': setFinanceRecords(prev => prev.filter(i => i.id !== id)); break;
         case 'offlineVisit': setOfflineVisits(prev => prev.filter(i => i.id !== id)); break;
         case 'todoItem': setTodoList(prev => prev.filter(i => i.id !== id)); break;
-        case 'meetingRecord': setMeetingRecords(prev => prev.filter(i => i.id !== id)); break;
+        case 'studentExam': setStudentExams(prev => prev.filter(i => i.id !== id)); break;
       }
     } else if (modalConfig.type === 'clearAll') {
       setYesterdayClasses([]);
@@ -407,7 +400,7 @@ export default function App() {
       setCooperationNote('');
       setRedList([]);
       setBossInstructions([]);
-      setMeetingRecords([]);
+      setStudentExams([]);
     }
 
     closeModal();
@@ -430,62 +423,6 @@ export default function App() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-blue-100 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-6">
-            <Users className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-serif font-bold text-slate-900 mb-2">{t.brandName}</h1>
-          <p className="text-slate-500 mb-8 font-medium">{t.systemName}</p>
-          
-          <form onSubmit={handleAuth} className="space-y-4 text-left">
-            {authError && (
-              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">
-                {authError}
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
-              <input 
-                type="email" 
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Password</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue focus:border-brand-blue outline-none"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full py-3 px-4 bg-brand-blue text-white rounded-xl font-bold hover:bg-blue-600 transition-colors shadow-lg flex items-center justify-center gap-2"
-            >
-              Sign In
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   if (!isDataLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -497,8 +434,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans" ref={dashboardRef}>
       {/* Header */}
-      <header className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        <div className="flex items-center gap-6">
+      <header className="h-20 bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-6xl mx-auto px-8 h-full flex items-center justify-between">
+          <div className="flex items-center gap-6">
           <div className="flex flex-col leading-tight">
             <h1 className="text-2xl font-serif font-bold tracking-tight text-slate-900 whitespace-nowrap">
               {t.brandName}
@@ -587,37 +525,33 @@ export default function App() {
             <div className="w-px h-6 bg-slate-200 mx-2"></div>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-sm">
-                {user.email?.charAt(0).toUpperCase() || 'U'}
+                A
               </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           </div>
+        </div>
         </div>
       </header>
 
       {/* Boss Instructions Banner - Redesigned for official look */}
-      <div className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex items-center gap-6">
-        <div className="flex items-center gap-3 bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg shrink-0">
-          <Bell className="w-5 h-5 text-amber-500" />
-          <span className="text-sm font-bold uppercase tracking-[0.2em] text-amber-500">{t.bossInstructions}</span>
-        </div>
-        <div className="flex-1 flex flex-wrap gap-x-8 gap-y-2">
-          {bossInstructions.map((instruction, idx) => (
-            <div key={idx} className="flex items-center gap-2 text-slate-100 font-bold text-sm">
-              <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-              {instruction}
-            </div>
-          ))}
+      <div className="bg-slate-900 border-b border-slate-800">
+        <div className="max-w-6xl mx-auto px-8 py-4 flex items-center gap-6">
+          <div className="flex items-center gap-3 bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg shrink-0">
+            <Bell className="w-5 h-5 text-amber-500" />
+            <span className="text-sm font-bold uppercase tracking-[0.2em] text-amber-500">{t.bossInstructions}</span>
+          </div>
+          <div className="flex-1 flex flex-wrap gap-x-8 gap-y-2">
+            {bossInstructions.map((instruction, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-slate-100 font-bold text-sm">
+                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                {instruction}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <main className="p-8 max-w-[1600px] mx-auto">
+      <main className="p-8 max-w-6xl mx-auto">
         {/* Section 1: Yesterday Review */}
         <SectionBlock title={t.yesterdayReview} icon={<Clock className="w-6 h-6" />}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -877,7 +811,7 @@ export default function App() {
 
         {/* Section 3: Today Academic Affairs */}
         <SectionBlock title={t.academicAffairs} icon={<Calendar className="w-6 h-6" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
             <SubSection title={t.agencyTracking} onAdd={() => openModal('agencyTracking', t.addRecord)}>
               <div className="space-y-3">
                 {agencyTracking.map(item => (
@@ -943,6 +877,25 @@ export default function App() {
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openModal('trialClass', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
                       <button onClick={() => handleDelete('trialClass', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SubSection>
+
+            <SubSection title={t.studentExams} onAdd={() => openModal('studentExam', t.addRecord)}>
+              <div className="space-y-3">
+                {studentExams.map(item => (
+                  <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 relative group">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-slate-800">{item.student}</span>
+                      <span className="text-[10px] font-bold text-brand-blue">{item.date}</span>
+                    </div>
+                    <div className="text-xs font-bold text-slate-700 mb-1">{item.examName}</div>
+                    <div className="text-[10px] text-brand-red font-bold">{t.score}: {item.score}</div>
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openModal('studentExam', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('studentExam', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1151,45 +1104,6 @@ export default function App() {
             </button>
           </div>
         </SectionBlock>
-
-        {/* Section 9: Meeting Records */}
-        <SectionBlock title={t.meetingRecords} icon={<FileText className="w-6 h-6" />}>
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-end">
-              <button 
-                onClick={() => openModal('meetingRecord', t.addRecord)}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-all shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" /> {t.addRecord}
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {meetingRecords.map(record => (
-                <div key={record.id} className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm relative group hover:shadow-md transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md">{record.date}</span>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('meetingRecord', t.editRecord, record, true)} className="p-1.5 bg-slate-50 rounded-lg hover:text-brand-blue transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDelete('meetingRecord', record.id)} className="p-1.5 bg-slate-50 rounded-lg hover:text-brand-red transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-                  <h4 className="text-base font-bold text-slate-900 mb-2">{record.title}</h4>
-                  <div className="text-xs text-slate-500 mb-4 whitespace-pre-wrap line-clamp-4">{record.content}</div>
-                  <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs font-bold text-slate-600">{record.attendees}</span>
-                  </div>
-                </div>
-              ))}
-              {meetingRecords.length === 0 && (
-                <div className="col-span-full flex flex-col items-center justify-center py-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400">
-                  <FileText className="w-8 h-8 mb-3 opacity-50" />
-                  <p className="text-sm font-bold">{t.noTasks}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </SectionBlock>
       </main>
 
       {/* Modal */}
@@ -1320,20 +1234,12 @@ export default function App() {
                   <Select label={t.to} name="to" options={EMPLOYEES} />
                 </>
               )}
-              {modalConfig.type === 'meetingRecord' && (
+              {modalConfig.type === 'studentExam' && (
                 <>
-                  <Input label={t.date} name="date" type="date" required />
-                  <Input label={t.meetingTitle} name="title" required />
-                  <Input label={t.attendees} name="attendees" required />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t.meetingContent}</label>
-                    <textarea 
-                      name="content" 
-                      defaultValue={modalConfig.data?.content || ''}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-30 focus:bg-white transition-all h-32 resize-none"
-                      required
-                    />
-                  </div>
+                  <Input label={t.date} name="date" type="date" required defaultValue={currentDate.toLocaleDateString('en-CA')} />
+                  <Input label={t.student} name="student" required defaultValue={modalConfig.data?.student || ''} />
+                  <Input label={t.examName} name="examName" required defaultValue={modalConfig.data?.examName || ''} />
+                  <Input label={t.score} name="score" required defaultValue={modalConfig.data?.score || ''} />
                 </>
               )}
               {modalConfig.type === 'clearAll' && (
@@ -1374,7 +1280,7 @@ export default function App() {
       
       {/* Footer / Employee List */}
       <footer className="bg-slate-900 text-white p-8 mt-12">
-        <div className="max-w-[1600px] mx-auto">
+        <div className="max-w-6xl mx-auto">
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
             <Users className="w-4 h-4" /> {t.teamMembers}
           </h3>

@@ -66,11 +66,11 @@ export const translations = {
     isCompleted: '是否已完成',
     
     // New
-    meetingRecords: '每周会议记录',
+    studentExams: '学生考试',
     date: '日期',
     attendees: '参会人员',
-    meetingTitle: '会议主题',
-    meetingContent: '会议内容',
+    examName: '考试名称',
+    score: '成绩',
     redList: '红名单预警',
     bossInstructions: '老板指令',
     exportPDF: '导出 PDF',
@@ -173,11 +173,11 @@ export const translations = {
     isCompleted: 'È completato?',
     
     // New
-    meetingRecords: 'Verbali delle Riunioni Settimanali',
+    studentExams: 'Esami degli Studenti',
     date: 'Data',
     attendees: 'Partecipanti',
-    meetingTitle: 'Oggetto',
-    meetingContent: 'Contenuto della Riunione',
+    examName: 'Nome dell\'Esame',
+    score: 'Punteggio',
     redList: 'Allerta Lista Rossa',
     bossInstructions: 'Istruzioni del Capo',
     exportPDF: 'Esporta PDF',
