@@ -1,0 +1,1 @@
+signUpWithEmailAndPassword=function(e,t){return Pi(this,void 0,void 0,(function(){return Ci(this,(function(r){switch(r.label){case 0:return"string"!=typeof e&&(0,de.throwError)(ze.ERRORS.INVALID_PARAMS,"email must be a string"),"string"!=typeof t&&(0,de.throwError)(ze.ERRORS.INVALID_PARAMS,"password must be a string"),[4,thi

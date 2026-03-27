@@ -1,0 +1,1 @@
+signUp=function(e){return Mi(this,void 0,void 0,(function(){var t,r,n=this;return Bi(this,(function(o){switch(o.label){case 0:return e.phone_number||e.verification_code||e.verification_token||e.provider_token?(e.phone_number=this.formatPhone(e.phone_number),[4,this.oauthInstance.authApi.signUp(e)]):[3,2];case 1:re

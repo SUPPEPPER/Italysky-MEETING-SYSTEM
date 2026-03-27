@@ -1,0 +1,1 @@
+Hi=function(){function e(e){var t=e.envId,r=e.cache,n=e.oauthInstance;t||(0,de.throwError)(ze.ERRORS.INVALID_PARAMS,"envId is not defined"),this.cache=r,this.oauthInstance=n,this.user=new Fi({cache:this.cache,oauthInstance:n})}return e.prototype.checkLocalState=function(){var e;this.oauthLoginState=null===(e=t

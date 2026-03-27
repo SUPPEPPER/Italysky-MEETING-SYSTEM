@@ -28,7 +28,8 @@ import {
   Trash2,
   X,
   Bell,
-  FileDown
+  FileDown,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -44,7 +45,8 @@ import {
   Area
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
-import { useLocalStorageData } from './hooks/useLocalStorageData';
+import { useCloudBaseData, setDbErrorCallback } from './hooks/useCloudBaseData';
+import { auth } from './cloudbase';
 import { 
   Employee,
   YesterdayClass,
@@ -84,34 +86,154 @@ export default function App() {
   const dashboardRef = useRef<HTMLDivElement>(null);
   
   // State
-  const [lang, setLang] = useLocalStorageData<Language>('lang', 'zh');
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [lang, setLang] = useCloudBaseData<Language>('lang', 'zh', user?.uid);
   const t = translations[lang];
 
-  const [cooperationNote, setCooperationNote, init13] = useLocalStorageData('cooperationNote', '');
+  const [cooperationNote, setCooperationNote, init13] = useCloudBaseData('cooperationNote', '', user?.uid);
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // Format date to YYYY-MM-DD in local time
   const dateString = currentDate.toLocaleDateString('en-CA');
 
-  const [yesterdayClasses, setYesterdayClasses, init1, docExists] = useLocalStorageData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, dateString);
-  const [yesterdayMedia, setYesterdayMedia, init2] = useLocalStorageData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, dateString);
-  const [todayClasses, setTodayClasses, init3] = useLocalStorageData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, dateString);
-  const [agencyTracking, setAgencyTracking, init4] = useLocalStorageData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, dateString);
-  const [studentRegistrations, setStudentRegistrations, init5] = useLocalStorageData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, dateString);
-  const [classFormations, setClassFormations, init6] = useLocalStorageData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, dateString);
-  const [trialClasses, setTrialClasses, init7] = useLocalStorageData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, dateString);
-  const [mediaOperations, setMediaOperations, init8] = useLocalStorageData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, dateString);
-  const [salesConversion, setSalesConversion, init9] = useLocalStorageData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, dateString);
-  const [financeRecords, setFinanceRecords, init10] = useLocalStorageData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS);
-  const [offlineVisits, setOfflineVisits, init11] = useLocalStorageData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, dateString);
-  const [studentExams, setStudentExams, init16] = useLocalStorageData<StudentExam[]>('studentExams', INITIAL_STUDENT_EXAMS, dateString);
+  const [yesterdayClasses, setYesterdayClasses, init1, docExists] = useCloudBaseData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid, dateString);
+  const [yesterdayMedia, setYesterdayMedia, init2] = useCloudBaseData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid, dateString);
+  const [todayClasses, setTodayClasses, init3] = useCloudBaseData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid, dateString);
+  const [agencyTracking, setAgencyTracking, init4] = useCloudBaseData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid, dateString);
+  const [studentRegistrations, setStudentRegistrations, init5] = useCloudBaseData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid, dateString);
+  const [classFormations, setClassFormations, init6] = useCloudBaseData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid, dateString);
+  const [trialClasses, setTrialClasses, init7] = useCloudBaseData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid, dateString);
+  const [mediaOperations, setMediaOperations, init8] = useCloudBaseData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid, dateString);
+  const [salesConversion, setSalesConversion, init9] = useCloudBaseData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid, dateString);
+  const [financeRecords, setFinanceRecords, init10] = useCloudBaseData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid);
+  const [offlineVisits, setOfflineVisits, init11] = useCloudBaseData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid, dateString);
+  const [studentExams, setStudentExams, init16] = useCloudBaseData<StudentExam[]>('studentExams', INITIAL_STUDENT_EXAMS, user?.uid, dateString);
 
-  const [redList, setRedList, init14] = useLocalStorageData<{id: string, name: string, reason: string}[]>('redList', []);
-  const [bossInstructions, setBossInstructions, init15] = useLocalStorageData<string[]>('bossInstructions', []);
-  const [todoList, setTodoList, init12] = useLocalStorageData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, dateString);
+  const [redList, setRedList, init14] = useCloudBaseData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
+  const [bossInstructions, setBossInstructions, init15] = useCloudBaseData<string[]>('bossInstructions', [], user?.uid);
+  const [todoList, setTodoList, init12] = useCloudBaseData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid, dateString);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationCodeSent, setVerificationCodeSent] = useState(false);
+  const verifyOtpFnRef = useRef<any>(null);
+  const [dbError, setDbError] = useState(false);
 
   useEffect(() => {
-    if (init1 && !docExists) {
+    setDbErrorCallback((show) => setDbError(show));
+  }, []);
+
+  useEffect(() => {
+    const checkLogin = async () => {
+      try {
+        const loginState = await auth.getLoginState();
+        if (loginState) {
+          setUser(loginState.user);
+        } else {
+          setUser(null);
+        }
+      } catch (e) {
+        console.error('Failed to get login state', e);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    checkLogin();
+  }, []);
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    
+    if (!trimmedEmail || !trimmedPassword) {
+      alert('请输入邮箱和密码');
+      return;
+    }
+    
+    try {
+      setAuthLoading(true);
+      if (isRegisterMode) {
+        if (!verificationCodeSent) {
+          // 发送验证码
+          const res = await auth.signUpWithEmailAndPassword(trimmedEmail, trimmedPassword);
+          if (res && res.data && res.data.verifyOtp) {
+            verifyOtpFnRef.current = res.data.verifyOtp;
+            setVerificationCodeSent(true);
+            alert('验证码已发送到您的邮箱，请查收并输入');
+          } else {
+            alert('注册成功！请登录');
+            setIsRegisterMode(false);
+          }
+        } else {
+          // 验证验证码
+          const trimmedCode = verificationCode.trim();
+          if (!trimmedCode) {
+            alert('请输入验证码');
+            setAuthLoading(false);
+            return;
+          }
+          if (verifyOtpFnRef.current) {
+            await verifyOtpFnRef.current({ token: trimmedCode });
+            const loginState = await auth.getLoginState();
+            if (loginState && loginState.user) {
+              alert('验证成功，注册完成！');
+              setUser(loginState.user);
+            } else {
+              alert('验证成功，请登录');
+              setIsRegisterMode(false);
+              setVerificationCodeSent(false);
+              setVerificationCode('');
+              verifyOtpFnRef.current = null;
+            }
+            return;
+          } else {
+            alert('验证流程异常，请刷新重试');
+          }
+        }
+      } else {
+        // 登录
+        const res = await auth.signInWithEmailAndPassword(trimmedEmail, trimmedPassword);
+        const loginState = await auth.getLoginState();
+        const loggedInUser = loginState?.user || (res as any)?.user;
+        if (loggedInUser) {
+          setUser(loggedInUser);
+        } else {
+          throw new Error('获取登录状态失败，请刷新页面重试');
+        }
+      }
+    } catch (err: any) {
+      console.error('Auth failed', err);
+      alert(`操作失败: ${err.message || '请检查账号密码或控制台是否开启了邮箱登录'}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleAnonymousLogin = async () => {
+    try {
+      setAuthLoading(true);
+      await auth.anonymousAuthProvider().signIn();
+      const loginState = await auth.getLoginState();
+      setUser(loginState?.user);
+    } catch (e) {
+      console.error('Anonymous login failed', e);
+      alert('匿名登录失败，请确保在腾讯云控制台开启了匿名登录。');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    setUser(null);
+  };
+
+  useEffect(() => {
+    if (init1 && !docExists && user) {
       // Fetch yesterday's todayClasses
       const yesterdayDate = new Date(currentDate);
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -423,6 +545,100 @@ export default function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+          <h1 className="text-3xl font-serif font-bold text-slate-900 mb-2">{t.brandName}</h1>
+          <p className="text-slate-500 mb-8">{t.systemName}</p>
+          
+          <form onSubmit={handleEmailAuth} className="flex flex-col gap-4 mb-4">
+            <input
+              type="email"
+              placeholder="邮箱地址"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              required
+              disabled={verificationCodeSent}
+            />
+            <input
+              type="password"
+              placeholder="密码 (至少8位)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              required
+              minLength={8}
+              disabled={verificationCodeSent}
+            />
+            {isRegisterMode && verificationCodeSent && (
+              <input
+                type="text"
+                placeholder="请输入邮箱验证码"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+                required
+              />
+            )}
+            <button
+              type="submit"
+              className="w-full py-3 px-4 bg-brand-blue hover:bg-blue-700 text-white rounded-xl font-bold transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={authLoading}
+            >
+              {authLoading ? '处理中...' : (isRegisterMode ? (verificationCodeSent ? '验证并注册' : '发送验证码') : '登录')}
+            </button>
+          </form>
+
+          <div className="flex items-center justify-between text-sm text-slate-500 mb-6">
+            <button 
+              type="button"
+              onClick={() => {
+                setIsRegisterMode(!isRegisterMode);
+                setVerificationCodeSent(false);
+                setVerificationCode('');
+              }}
+              className="hover:text-brand-blue transition-colors"
+            >
+              {isRegisterMode ? '已有账号？去登录' : '没有账号？去注册'}
+            </button>
+          </div>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-slate-400">或者</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <button
+              type="button"
+              onClick={handleAnonymousLogin}
+              className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
+            >
+              匿名体验 (测试用)
+            </button>
+          </div>
+          <p className="mt-6 text-xs text-slate-400">
+            请确保已在腾讯云控制台开启“邮箱登录”和“匿名登录”
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isDataLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -433,6 +649,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans" ref={dashboardRef}>
+      {dbError && (
+        <div className="bg-red-50 border-b border-red-200 p-4 text-red-800 text-sm text-center shadow-sm relative z-[60]">
+          <p className="font-bold mb-1">⚠️ 数据库连接失败 (网络请求错误)</p>
+          <p>请检查：1. <code>.env</code> 文件中的 <code>VITE_TCB_REGION</code> 是否正确。2. 云开发控制台是否已开启数据库服务。3. 是否已将当前域名添加到“安全应用来源”。</p>
+          <button onClick={() => setDbError(false)} className="absolute right-4 top-4 text-red-500 hover:text-red-700">
+            ✕
+          </button>
+        </div>
+      )}
       {/* Header */}
       <header className="h-20 bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-8 h-full flex items-center justify-between">
@@ -527,6 +752,13 @@ export default function App() {
               <div className="w-8 h-8 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-sm">
                 A
               </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                title="退出登录"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>

@@ -1,0 +1,1 @@
+createLoginState=function(e,t){var r,n;return Mi(this,void 0,void 0,(function(){var o;return Bi(this,(function(i){switch(i.label){case 0:return[4,(o=new Hi({envId:this.config.env,cache:this.cache,oauthInstance:this.oauthInstance})).checkLocalStateAsync()];case 1:return i.sent(),(null==t?void 0:t.userInfo)?(o.user.setLocalUs

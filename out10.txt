@@ -1,0 +1,1 @@
+Fi=function(){function e(e){var t=e.cache,r=e.oauthInstance;this.cache=t,this.oauthInstance=r,this.setUserInfo()}return e.prototype.checkLocalInfo=function(){return Mi(this,void 0,void 0,(function(){return Bi(this,(function(e){return this.uid=this.getLocalUserInfo("uid"),this.gender=this.getLocalUserInfo("gend

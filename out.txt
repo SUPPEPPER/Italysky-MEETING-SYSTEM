@@ -1,0 +1,28 @@
+.VERIFY_URL="/v1/verification/verify",e.CAPTCHA_DATA_URL="/v1/capt
+HA_DATA_URL="/v1/captcha/data/verify",e.GET_CAPTCHA_URL="/v1/captc
+.concat(Se);try{var n=yield t.verifyCaptchaData({token:r.token,key
+||!1,withCredentials:o})}))()}verify(e){var t=this;return je((func
+y:{provider_id:"weda"}})}))()}verifyCaptchaData(e){var t=this;retu
+esult() 在当前版本中无法实现。 建议使用 auth.verifyOAuth({ code, state, provider 
+3:return t=o.sent(),[2,{data:{verifyOtp:function(r){var o=r.token,
+c.trys.push([0,8,,9]),[4,this.verify({verification_id:s||t.verific
+{data:{user:null,session:null,verifyOtp:function(t){var r=t.token,
+is,(function(t){return[2,this.verifyOtp({email:e.email,phone:e.pho
+return[2]}}))}))},t.prototype.verifyOAuth=function(e){return Mi(th
+ata:t,error:new Ne(c,{method:"verifyOAuth"})}];case 8:return[2]}})
+c.trys.push([1,5,,6]),[4,this.verify({verification_id:s.verificati
+return[2]}}))}))},t.prototype.verifyOtp=function(e){return Mi(this
+_change"].includes(t)?[4,this.verify({verification_id:e.messageId,
+ta:{},error:new Ne(o,{method:"verifyOtp"})}];case 7:return[2]}}))}
+={messageId:f.verification_id,verifyOtp:function(t){return Mi(g,vo
+il&&e.email===t.email?[4,this.verifyOtp({type:"email_change",email
+ne&&e.phone===t.phone?[4,this.verifyOtp({type:"phone_change",phone
+(),[3,9];case 6:return[4,this.verifyOtp({type:c,email:i?e.email:vo
+[1,9,,10]),e.password?[4,this.verify({verification_id:r.verificati
+i.editContact(e)},t.prototype.verify=function(e){return Mi(this,vo
+[2,this.oauthInstance.authApi.verify(e)]}))}))},t.prototype.getVer
+haData(e)]}))}))},t.prototype.verifyCaptchaData=function(e){return
+[2,this.oauthInstance.authApi.verifyCaptchaData(e)]}))}))},t.proto
+[4,this.oauthInstance.authApi.verify({verification_id:r.verificati
+:["请确认以下各项：","  1 - 调用 auth().verify() 的语法或参数是否正确","  2 - 当前环境是否开通
+ntype",Promise)],t.prototype,"verify",null),qi([(0,Ke.catchErrorsD
