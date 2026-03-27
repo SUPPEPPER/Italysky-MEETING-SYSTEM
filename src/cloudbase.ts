@@ -1,8 +1,9 @@
 import cloudbase from '@cloudbase/js-sdk';
 
-// 从环境变量读取腾讯云开发环境 ID
-const envId = import.meta.env.VITE_TCB_ENV_ID || 'my-web-app-9g9c9095c3bc8b5f';
-const region = import.meta.env.VITE_TCB_REGION || 'ap-shanghai';
+// ---------------- 直接把你的 ID 填在这里 ----------------
+const envId = 'my-web-app-9g9c9095c3bc8b5f'; // 这里填你那一串真实的环境 ID
+const region = 'ap-shanghai';      // 这里填你的地域（比如 ap-shanghai）
+// -----------------------------------------------------
 
 export const app = cloudbase.init({
   env: envId,
