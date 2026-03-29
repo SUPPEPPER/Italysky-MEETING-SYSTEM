@@ -26,7 +26,8 @@ export function useCloudBaseData<T>(
       return;
     }
 
-    const docId = dateString ? `dashboard_${userId}_${dateString}_${key}` : `dashboard_global_${userId}_${key}`;
+    // 使用固定的前缀 shared_ 代替 userId，这样所有人看到的数据都是一样的
+    const docId = dateString ? `dashboard_shared_${dateString}_${key}` : `dashboard_shared_global_${key}`;
     const collectionName = 'dashboard_data';
 
     const docRef = db.collection(collectionName).doc(docId);

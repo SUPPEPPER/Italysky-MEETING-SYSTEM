@@ -46,7 +46,7 @@ import {
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { useCloudBaseData, setDbErrorCallback } from './hooks/useCloudBaseData';
-import { auth } from './cloudbase';
+import { auth, db } from './cloudbase';
 import { 
   Employee,
   YesterdayClass,
@@ -93,6 +93,8 @@ export default function App() {
 
   const [cooperationNote, setCooperationNote, init13] = useCloudBaseData('cooperationNote', '', user?.uid);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [exportStartDate, setExportStartDate] = useState(new Date());
+  const [exportEndDate, setExportEndDate] = useState(new Date());
   
   // Format date to YYYY-MM-DD in local time
   const dateString = currentDate.toLocaleDateString('en-CA');
@@ -114,12 +116,9 @@ export default function App() {
   const [bossInstructions, setBossInstructions, init15] = useCloudBaseData<string[]>('bossInstructions', [], user?.uid);
   const [todoList, setTodoList, init12] = useCloudBaseData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid, dateString);
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationCodeSent, setVerificationCodeSent] = useState(false);
-  const verifyOtpFnRef = useRef<any>(null);
   const [dbError, setDbError] = useState(false);
 
   useEffect(() => {
@@ -130,8 +129,14 @@ export default function App() {
     const checkLogin = async () => {
       try {
         const loginState = await auth.getLoginState();
-        if (loginState) {
-          setUser(loginState.user);
+        // 如果是匿名登录，我们还需要检查本地是否有我们自定义的用户名状态
+        if (loginState && loginState.user) {
+          const savedUser = localStorage.getItem('custom_user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          } else {
+            setUser(null);
+          }
         } else {
           setUser(null);
         }
@@ -144,70 +149,64 @@ export default function App() {
     checkLogin();
   }, []);
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const handleCustomAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedEmail = email.trim();
+    const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
     
-    if (!trimmedEmail || !trimmedPassword) {
-      alert('请输入邮箱和密码');
+    if (!trimmedUsername || !trimmedPassword) {
+      alert('请输入用户名和密码');
       return;
     }
     
     try {
       setAuthLoading(true);
+      
+      // 1. 确保底层已经匿名登录，这样才能访问数据库
+      let loginState = await auth.getLoginState();
+      if (!loginState) {
+        await auth.anonymousAuthProvider().signIn();
+      }
+      
+      const usersRef = db.collection('app_users');
+      
       if (isRegisterMode) {
-        if (!verificationCodeSent) {
-          // 发送验证码
-          const res = await auth.signUpWithEmailAndPassword(trimmedEmail, trimmedPassword);
-          if (res && res.data && res.data.verifyOtp) {
-            verifyOtpFnRef.current = res.data.verifyOtp;
-            setVerificationCodeSent(true);
-            alert('验证码已发送到您的邮箱，请查收并输入');
-          } else {
-            alert('注册成功！请登录');
-            setIsRegisterMode(false);
-          }
-        } else {
-          // 验证验证码
-          const trimmedCode = verificationCode.trim();
-          if (!trimmedCode) {
-            alert('请输入验证码');
-            setAuthLoading(false);
-            return;
-          }
-          if (verifyOtpFnRef.current) {
-            await verifyOtpFnRef.current({ token: trimmedCode });
-            const loginState = await auth.getLoginState();
-            if (loginState && loginState.user) {
-              alert('验证成功，注册完成！');
-              setUser(loginState.user);
-            } else {
-              alert('验证成功，请登录');
-              setIsRegisterMode(false);
-              setVerificationCodeSent(false);
-              setVerificationCode('');
-              verifyOtpFnRef.current = null;
-            }
-            return;
-          } else {
-            alert('验证流程异常，请刷新重试');
-          }
+        // 注册逻辑
+        const existRes = await usersRef.where({ username: trimmedUsername }).get();
+        if (existRes.data && existRes.data.length > 0) {
+          alert('该用户名已被注册，请直接登录或换一个名字');
+          return;
         }
+        
+        await usersRef.add({
+          username: trimmedUsername,
+          password: trimmedPassword, // 注意：实际生产环境不建议明文存储密码
+          createdAt: new Date().toISOString()
+        });
+        
+        const newUser = { uid: trimmedUsername, name: trimmedUsername };
+        localStorage.setItem('custom_user', JSON.stringify(newUser));
+        setUser(newUser);
+        alert('注册成功！已为您自动登录');
+        
       } else {
-        // 登录
-        const res = await auth.signInWithEmailAndPassword(trimmedEmail, trimmedPassword);
-        const loginState = await auth.getLoginState();
-        const loggedInUser = loginState?.user || (res as any)?.user;
-        if (loggedInUser) {
+        // 登录逻辑
+        const res = await usersRef.where({
+          username: trimmedUsername,
+          password: trimmedPassword
+        }).get();
+        
+        if (res.data && res.data.length > 0) {
+          const loggedInUser = { uid: res.data[0]._id, name: trimmedUsername };
+          localStorage.setItem('custom_user', JSON.stringify(loggedInUser));
           setUser(loggedInUser);
         } else {
-          throw new Error('获取登录状态失败，请刷新页面重试');
+          alert('用户名或密码错误');
         }
       }
     } catch (err: any) {
       console.error('Auth failed', err);
-      alert(`操作失败: ${err.message || '请检查账号密码或控制台是否开启了邮箱登录'}`);
+      alert(`操作失败: ${err.message || '请检查网络或控制台配置'}`);
     } finally {
       setAuthLoading(false);
     }
@@ -218,7 +217,9 @@ export default function App() {
       setAuthLoading(true);
       await auth.anonymousAuthProvider().signIn();
       const loginState = await auth.getLoginState();
-      setUser(loginState?.user);
+      const anonUser = { uid: loginState?.user?.uid || 'anonymous', name: '匿名用户' };
+      localStorage.setItem('custom_user', JSON.stringify(anonUser));
+      setUser(anonUser);
     } catch (e) {
       console.error('Anonymous login failed', e);
       alert('匿名登录失败，请确保在腾讯云控制台开启了匿名登录。');
@@ -228,6 +229,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    localStorage.removeItem('custom_user');
     await auth.signOut();
     setUser(null);
   };
@@ -309,7 +311,7 @@ export default function App() {
     setCurrentDate(newDate);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalConfig) return;
 
@@ -523,22 +525,76 @@ export default function App() {
       setRedList([]);
       setBossInstructions([]);
       setStudentExams([]);
+    } else if (modalConfig.type === 'exportExcel') {
+      await handleExportExcel();
+      return; // handleExportExcel already closes the modal
     }
 
     closeModal();
   };
 
-  const exportToExcel = () => {
+  const openExportModal = () => {
+    setExportStartDate(currentDate);
+    setExportEndDate(currentDate);
+    openModal('exportExcel', t.exportExcel);
+  };
+
+  const handleExportExcel = async () => {
     try {
-      const data = [
-        ...yesterdayClasses.map(c => ({ Section: 'Yesterday Classes', ...c })),
-        ...todayClasses.map(c => ({ Section: 'Today Schedule', ...c })),
-        ...todoList.map(t => ({ Section: 'ToDo List', ...t })),
-      ];
-      const ws = XLSX.utils.json_to_sheet(data);
+      const start = new Date(exportStartDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(exportEndDate);
+      end.setHours(23, 59, 59, 999);
+
+      if (start > end) {
+        alert('开始日期不能晚于结束日期');
+        return;
+      }
+
+      // Generate all date strings in the range
+      const dateStrings: string[] = [];
+      let current = new Date(start);
+      while (current <= end) {
+        dateStrings.push(current.toLocaleDateString('en-CA'));
+        current.setDate(current.getDate() + 1);
+      }
+
+      let allData: any[] = [];
+
+      // Fetch data for each date
+      for (const ds of dateStrings) {
+        const fetchCollection = async (key: string, sectionName: string) => {
+          const docId = `dashboard_shared_${ds}_${key}`;
+          try {
+            const res = await db.collection('dashboard_data').doc(docId).get();
+            if (res.data && res.data.length > 0 && Array.isArray(res.data[0].value)) {
+              return res.data[0].value.map((item: any) => ({ Date: ds, Section: sectionName, ...item }));
+            }
+          } catch (e) {
+            console.error(`Error fetching ${key} for ${ds}:`, e);
+          }
+          return [];
+        };
+
+        const [yClasses, tClasses, tList] = await Promise.all([
+          fetchCollection('yesterdayClasses', 'Yesterday Classes'),
+          fetchCollection('todayClasses', 'Today Schedule'),
+          fetchCollection('todoList', 'ToDo List')
+        ]);
+
+        allData = [...allData, ...yClasses, ...tClasses, ...tList];
+      }
+
+      if (allData.length === 0) {
+        alert('该时间段内没有数据可导出');
+        return;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(allData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Dashboard Data");
-      XLSX.writeFile(wb, `Dali_Education_Report_${dateString}.xlsx`);
+      XLSX.writeFile(wb, `Dali_Education_Report_${exportStartDate.toLocaleDateString('en-CA')}_to_${exportEndDate.toLocaleDateString('en-CA')}.xlsx`);
+      closeModal();
     } catch (error) {
       console.error('Excel Export Error:', error);
       alert('Excel 导出失败，请重试');
@@ -547,7 +603,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950/50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
       </div>
     );
@@ -555,57 +611,42 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
-          <h1 className="text-3xl font-serif font-bold text-slate-900 mb-2">{t.brandName}</h1>
-          <p className="text-slate-500 mb-8">{t.systemName}</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950/50 p-4">
+        <div className="bg-slate-800/40 p-8 rounded-2xl shadow-2xl shadow-brand-blue/10 w-full max-w-md text-center">
+          <h1 className="text-3xl font-serif font-bold text-slate-100 mb-2">{t.brandName}</h1>
+          <p className="text-slate-400 mb-8">{t.systemName}</p>
           
-          <form onSubmit={handleEmailAuth} className="flex flex-col gap-4 mb-4">
+          <form onSubmit={handleCustomAuth} className="flex flex-col gap-4 mb-4">
             <input
-              type="email"
-              placeholder="邮箱地址"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              type="text"
+              placeholder="用户名 (如: 张三)"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-900/50 text-slate-100 border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
               required
-              disabled={verificationCodeSent}
             />
             <input
               type="password"
-              placeholder="密码 (至少8位)"
+              placeholder="密码"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl bg-slate-900/50 text-slate-100 border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
               required
-              minLength={8}
-              disabled={verificationCodeSent}
             />
-            {isRegisterMode && verificationCodeSent && (
-              <input
-                type="text"
-                placeholder="请输入邮箱验证码"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
-                required
-              />
-            )}
             <button
               type="submit"
-              className="w-full py-3 px-4 bg-brand-blue hover:bg-blue-700 text-white rounded-xl font-bold transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 px-4 bg-brand-blue hover:bg-blue-700 text-slate-100 rounded-xl font-bold transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={authLoading}
             >
-              {authLoading ? '处理中...' : (isRegisterMode ? (verificationCodeSent ? '验证并注册' : '发送验证码') : '登录')}
+              {authLoading ? '处理中...' : (isRegisterMode ? '注册并登录' : '登录')}
             </button>
           </form>
 
-          <div className="flex items-center justify-between text-sm text-slate-500 mb-6">
+          <div className="flex items-center justify-between text-sm text-slate-400 mb-6">
             <button 
               type="button"
               onClick={() => {
                 setIsRegisterMode(!isRegisterMode);
-                setVerificationCodeSent(false);
-                setVerificationCode('');
               }}
               className="hover:text-brand-blue transition-colors"
             >
@@ -615,10 +656,10 @@ export default function App() {
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
+              <div className="w-full border-t border-white/10"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-400">或者</span>
+              <span className="px-2 bg-slate-800/40 text-slate-400">或者</span>
             </div>
           </div>
 
@@ -626,13 +667,13 @@ export default function App() {
             <button
               type="button"
               onClick={handleAnonymousLogin}
-              className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
+              className="w-full py-3 px-4 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
             >
               匿名体验 (测试用)
             </button>
           </div>
           <p className="mt-6 text-xs text-slate-400">
-            请确保已在腾讯云控制台开启“邮箱登录”和“匿名登录”
+            请确保已在腾讯云控制台开启“匿名登录”并创建了 app_users 集合
           </p>
         </div>
       </div>
@@ -641,79 +682,78 @@ export default function App() {
 
   if (!isDataLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950/50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans" ref={dashboardRef}>
+    <div className="min-h-screen bg-slate-950/50 font-sans" ref={dashboardRef}>
       {dbError && (
-        <div className="bg-red-50 border-b border-red-200 p-4 text-red-800 text-sm text-center shadow-sm relative z-[60]">
+        <div className="bg-brand-red/10 border-b border-red-200 p-4 text-red-800 text-sm text-center shadow-lg shadow-black/20 relative z-[60]">
           <p className="font-bold mb-1">⚠️ 数据库连接失败 (网络请求错误)</p>
           <p>请检查：1. <code>.env</code> 文件中的 <code>VITE_TCB_REGION</code> 是否正确。2. 云开发控制台是否已开启数据库服务。3. 是否已将当前域名添加到“安全应用来源”。</p>
-          <button onClick={() => setDbError(false)} className="absolute right-4 top-4 text-red-500 hover:text-red-700">
+          <button onClick={() => setDbError(false)} className="absolute right-4 top-4 text-brand-red hover:text-red-700">
             ✕
           </button>
         </div>
       )}
       {/* Header */}
-      <header className="h-20 bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-8 h-full flex items-center justify-between">
-          <div className="flex items-center gap-6">
-          <div className="flex flex-col leading-tight">
-            <h1 className="text-2xl font-serif font-bold tracking-tight text-slate-900 whitespace-nowrap">
+      <header className="bg-slate-900/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 shadow-lg shadow-brand-blue/5">
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full md:w-auto">
+          <div className="flex flex-col leading-tight text-center sm:text-left">
+            <h1 className="text-2xl font-serif font-bold tracking-tight text-slate-100 whitespace-nowrap">
               {t.brandName}
             </h1>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">
+            <span className="text-xs font-bold text-brand-blue uppercase tracking-[0.2em] whitespace-nowrap">
               {t.systemName}
             </span>
           </div>
-          <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-full text-sm font-bold text-slate-700">
+          <div className="flex items-center gap-2 sm:gap-3 bg-slate-800/50 px-3 sm:px-4 py-2 rounded-full text-sm font-bold text-slate-300 border border-white/5 w-full sm:w-auto justify-center">
             <button 
               onClick={() => changeDate(-1)}
-              className="p-1 hover:text-brand-blue transition-colors rounded-full hover:bg-white-50"
+              className="p-1 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-2 min-w-[120px] justify-center relative group">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span className="cursor-pointer hover:text-brand-blue transition-colors">
-                {currentDate.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'it-IT', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')}
-              </span>
+            <div className="flex items-center gap-2 min-w-[130px] sm:min-w-[140px] justify-center relative group">
+              <Calendar className="w-4 h-4 text-slate-400 absolute left-2 pointer-events-none" />
               <input 
                 type="date" 
                 value={dateString}
                 onChange={(e) => {
-                  const [year, month, day] = e.target.value.split('-').map(Number);
-                  setCurrentDate(new Date(year, month - 1, day));
+                  if (e.target.value) {
+                    const [year, month, day] = e.target.value.split('-').map(Number);
+                    setCurrentDate(new Date(year, month - 1, day));
+                  }
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="w-full pl-8 pr-2 py-1 bg-transparent border-none text-slate-200 font-bold cursor-pointer hover:text-brand-blue transition-colors outline-none focus:ring-2 focus:ring-brand-blue/20 rounded-md"
               />
             </div>
             <button 
               onClick={() => changeDate(1)}
-              className="p-1 hover:text-brand-blue transition-colors rounded-full hover:bg-white-50"
+              className="p-1 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
             <button 
               onClick={() => setCurrentDate(new Date())}
-              className="ml-2 px-2 py-1 text-[10px] bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors whitespace-nowrap"
+              className="ml-1 sm:ml-2 px-2 py-1 text-[10px] bg-slate-800 border border-white/10 rounded-md hover:bg-slate-700 hover:text-brand-blue transition-colors whitespace-nowrap"
             >
               {t.today}
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center bg-slate-100 rounded-xl p-1">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 w-full md:w-auto">
+          <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-white/5">
             <button
               onClick={() => setLang('zh')}
               className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
-                lang === 'zh' ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
+                lang === 'zh' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
               )}
             >
               中文
@@ -721,40 +761,40 @@ export default function App() {
             <button
               onClick={() => setLang('it')}
               className={cn(
-                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
-                lang === 'it' ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+                "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
+                lang === 'it' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
               )}
             >
               Italiano
             </button>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => openModal('clearAll', t.clearAll)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
+              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-brand-red/10 text-brand-red hover:bg-brand-red/20 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap border border-brand-red/20"
             >
               <Trash2 className="w-4 h-4" />
-              {t.clearAll}
+              <span className="hidden sm:inline">{t.clearAll}</span>
             </button>
-            <span className="text-xs text-slate-400 hidden md:inline-block whitespace-nowrap">
+            <span className="text-xs text-slate-400 hidden lg:inline-block whitespace-nowrap">
               {t.printHint}
             </span>
             <button
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap"
+              onClick={openExportModal}
+              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg shadow-brand-blue/5 whitespace-nowrap border border-brand-blue/20"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              {t.exportExcel}
+              <span className="hidden sm:inline">{t.exportExcel}</span>
             </button>
-            <div className="w-px h-6 bg-slate-200 mx-2"></div>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-sm">
-                A
+            <div className="w-px h-6 bg-white/10 mx-1 sm:mx-2"></div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-slate-100 flex items-center justify-center font-bold text-sm shadow-lg shadow-brand-blue/20">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
               </div>
               <button
                 onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                className="p-2 text-slate-400 hover:text-brand-red hover:bg-brand-red/10 rounded-full transition-colors"
                 title="退出登录"
               >
                 <LogOut className="w-5 h-5" />
@@ -791,7 +831,7 @@ export default function App() {
             <SubSection title={t.yesterdayClasses} onAdd={() => openModal('yesterdayClass', t.addRecord)}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                  <thead className="bg-slate-950/50 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
                     <tr>
                       <th className="px-4 py-3">{t.courseName}</th>
                       <th className="px-4 py-3">{t.teacher}</th>
@@ -803,9 +843,9 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {yesterdayClasses.map(cls => (
-                      <tr key={cls.id} className="hover:bg-slate-50 group">
-                        <td className="px-4 py-3 font-bold text-slate-800">{cls.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{cls.teacher}</td>
+                      <tr key={cls.id} className="hover:bg-slate-950/50 group">
+                        <td className="px-4 py-3 font-bold text-slate-200">{cls.name}</td>
+                        <td className="px-4 py-3 text-slate-400">{cls.teacher}</td>
                         <td className="px-4 py-3">
                           {cls.feedbackCompleted ? (
                             <span className="text-brand-green flex items-center gap-1 font-bold">
@@ -817,8 +857,8 @@ export default function App() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{cls.absentStudents}</td>
-                        <td className="px-4 py-3 text-slate-500 italic text-xs">{cls.remarks}</td>
+                        <td className="px-4 py-3 text-slate-400">{cls.absentStudents}</td>
+                        <td className="px-4 py-3 text-slate-400 italic text-xs">{cls.remarks}</td>
                         <td className="px-4 py-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => openModal('yesterdayClass', t.editRecord, cls, true)} className="p-1 hover:text-brand-blue"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -836,20 +876,20 @@ export default function App() {
             <SubSection title={t.yesterdayMedia} onAdd={() => openModal('yesterdayMedia', t.addRecord)}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {yesterdayMedia.map(media => (
-                  <div key={media.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 relative group">
+                  <div key={media.id} className="p-4 bg-slate-950/50 rounded-xl border border-white/5 relative group">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded uppercase">
                         {media.platform}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-700">{media.accountName}</span>
+                      <span className="text-[10px] font-bold text-slate-300">{media.accountName}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-800 mb-2">{media.content}</p>
-                    <div className="text-xs text-slate-500 font-mono bg-white p-2 rounded border border-slate-100">
+                    <p className="text-sm font-bold text-slate-200 mb-2">{media.content}</p>
+                    <div className="text-xs text-slate-400 font-mono bg-slate-800/40 p-2 rounded border border-white/5">
                       {media.data}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('yesterdayMedia', t.editRecord, media, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('yesterdayMedia', media.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('yesterdayMedia', t.editRecord, media, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('yesterdayMedia', media.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -871,18 +911,18 @@ export default function App() {
                     <div className="flex items-center justify-between">
                       <span className={cn(
                         "text-[10px] font-bold px-2 py-1 rounded uppercase",
-                        cls.type === '线上' ? "bg-brand-blue text-white" : "bg-brand-green text-white"
+                        cls.type === '线上' ? "bg-brand-blue text-slate-100" : "bg-brand-green text-slate-100"
                       )}>
                         {cls.type === '线上' ? t.online : t.offline}
                       </span>
-                      <span className="text-xs font-bold text-slate-500">{cls.time}</span>
+                      <span className="text-xs font-bold text-slate-400">{cls.time}</span>
                     </div>
-                    <h4 className="text-sm font-bold text-slate-900">{cls.name}</h4>
+                    <h4 className="text-sm font-bold text-slate-100">{cls.name}</h4>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1 text-slate-600">
+                      <span className="flex items-center gap-1 text-slate-400">
                         <MapPin className="w-3 h-3" /> {cls.location}
                       </span>
-                      <span className="font-bold text-slate-700">@{cls.teacher}</span>
+                      <span className="font-bold text-slate-300">@{cls.teacher}</span>
                     </div>
                     {cls.feedbackReminder && (
                       <div className="mt-2 text-[10px] font-bold text-brand-red flex items-center gap-1 animate-pulse">
@@ -890,8 +930,8 @@ export default function App() {
                       </div>
                     )}
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('todayClass', t.editRecord, cls, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('todayClass', cls.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('todayClass', t.editRecord, cls, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('todayClass', cls.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -907,25 +947,25 @@ export default function App() {
                 </h3>
                 <button 
                   onClick={() => openModal('redList', t.addRecord)}
-                  className="p-1.5 bg-red-50 text-brand-red rounded-lg hover:bg-red-100 transition-colors"
+                  className="p-1.5 bg-brand-red/10 text-brand-red rounded-lg hover:bg-brand-red/20 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
               <div className="space-y-3">
                 {redList.map(item => (
-                  <div key={item.id} className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between relative group">
+                  <div key={item.id} className="p-4 bg-brand-red/10 border border-red-100 rounded-xl flex items-center justify-between relative group">
                     <div>
                       <div className="text-sm font-bold text-red-900">{item.name}</div>
-                      <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider">{item.reason}</div>
+                      <div className="text-[10px] font-bold text-brand-red uppercase tracking-wider">{item.reason}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-white rounded-lg shadow-sm text-brand-red group-hover:opacity-0 transition-opacity">
+                      <div className="p-2 bg-slate-800/40 rounded-lg shadow-lg shadow-black/20 text-brand-red group-hover:opacity-0 transition-opacity">
                         <AlertCircle className="w-4 h-4" />
                       </div>
                       <div className="absolute right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openModal('redList', t.editRecord, item, true)} className="p-1.5 bg-white rounded-lg shadow-sm hover:text-brand-blue"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete('redList', item.id)} className="p-1.5 bg-white rounded-lg shadow-sm hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => openModal('redList', t.editRecord, item, true)} className="p-1.5 bg-slate-800/40 rounded-lg shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDelete('redList', item.id)} className="p-1.5 bg-slate-800/40 rounded-lg shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
                   </div>
@@ -939,12 +979,12 @@ export default function App() {
         <SectionBlock title={t.todoListTitle} icon={<CheckCircle2 className="w-6 h-6" />}>
           <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-slate-500 font-bold italic">
+              <p className="text-xs text-slate-400 font-bold italic">
                 {t.todoListSubtitle}
               </p>
               <button 
                 onClick={() => openModal('todoItem', t.addRecord)}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-all shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-slate-100 rounded-xl text-xs font-bold hover:bg-brand-blue transition-all shadow-lg shadow-black/20"
               >
                 <Plus className="w-3.5 h-3.5" /> {t.addTask}
               </button>
@@ -954,19 +994,19 @@ export default function App() {
               {TODO_ASSIGNEES.map(assignee => {
                 const personTasks = todoList.filter(t => t.assignee === assignee);
                 return (
-                  <div key={assignee} className="flex flex-col gap-3 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-1">
+                  <div key={assignee} className="flex flex-col gap-3 p-5 bg-slate-800/40 rounded-2xl border border-white/10 shadow-lg shadow-black/20 hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-1">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-brand-blue-10 rounded-lg flex items-center justify-center text-brand-blue font-bold text-xs">
                           {assignee.split(' ')[0][0]}
                         </div>
-                        <h4 className="text-sm font-bold text-slate-900">
+                        <h4 className="text-sm font-bold text-slate-100">
                           {assignee}
                         </h4>
                       </div>
                       <button 
                         onClick={() => openModal('todoItem', `${t.add} ${assignee}`, { assignee })}
-                        className="p-1.5 hover:bg-slate-100 rounded-lg text-brand-blue transition-colors"
+                        className="p-1.5 hover:bg-slate-800/80 rounded-lg text-brand-blue transition-colors"
                         title={t.addTask}
                       >
                         <Plus className="w-4 h-4" />
@@ -976,17 +1016,17 @@ export default function App() {
                     <div className="flex flex-col gap-3 min-h-[120px]">
                       {personTasks.length > 0 ? (
                         personTasks.map(item => (
-                          <div key={item.id} className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 group relative hover:border-brand-blue-30 transition-colors">
+                          <div key={item.id} className="bg-slate-950/50 p-3.5 rounded-xl border border-white/5 group relative hover:border-brand-blue-30 transition-colors">
                             <div className="flex flex-col gap-2.5">
                               <p className={cn(
                                 "text-xs font-bold leading-relaxed",
-                                item.isCompleted ? "text-slate-400 line-through" : "text-slate-800"
+                                item.isCompleted ? "text-slate-400 line-through" : "text-slate-200"
                               )}>
                                 {item.task}
                               </p>
                               
                               {item.remarks && (
-                                <div className="text-[10px] text-slate-500 italic bg-white-80 p-2 rounded-lg border border-slate-100 flex gap-2">
+                                <div className="text-[10px] text-slate-400 italic bg-slate-800/80 p-2 rounded-lg border border-white/5 flex gap-2">
                                   <span className="text-slate-300 font-bold">#</span>
                                   {item.remarks}
                                 </div>
@@ -999,7 +1039,7 @@ export default function App() {
                                     "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all",
                                     item.isCompleted 
                                       ? "bg-green-100 text-brand-green" 
-                                      : "bg-white text-slate-400 hover:bg-slate-100 border border-slate-100"
+                                      : "bg-slate-800/40 text-slate-400 hover:bg-slate-800/80 border border-white/5"
                                   )}
                                 >
                                   {item.isCompleted ? (
@@ -1012,13 +1052,13 @@ export default function App() {
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => openModal('todoItem', t.editRecord, item, true)} 
-                                    className="p-1.5 hover:text-brand-blue bg-white rounded-md shadow-sm border border-slate-100"
+                                    className="p-1.5 hover:text-brand-blue bg-slate-800/40 rounded-md shadow-lg shadow-black/20 border border-white/5"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                   </button>
                                   <button 
                                     onClick={() => handleDelete('todoItem', item.id)} 
-                                    className="p-1.5 hover:text-brand-red bg-white rounded-md shadow-sm border border-slate-100"
+                                    className="p-1.5 hover:text-brand-red bg-slate-800/40 rounded-md shadow-lg shadow-black/20 border border-white/5"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                   </button>
@@ -1028,7 +1068,7 @@ export default function App() {
                           </div>
                         ))
                       ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-xl py-6">
+                        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-xl py-6">
                           <CheckCircle2 className="w-6 h-6 text-slate-100 mb-2" />
                           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{t.noTasks}</span>
                         </div>
@@ -1047,13 +1087,13 @@ export default function App() {
             <SubSection title={t.agencyTracking} onAdd={() => openModal('agencyTracking', t.addRecord)}>
               <div className="space-y-3">
                 {agencyTracking.map(item => (
-                  <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 relative group">
-                    <div className="text-sm font-bold text-slate-800 mb-1">{item.student}</div>
+                  <div key={item.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
+                    <div className="text-sm font-bold text-slate-200 mb-1">{item.student}</div>
                     <div className="text-xs text-brand-blue font-bold mb-1">[{item.status}]</div>
                     <div className="text-[10px] text-brand-red font-bold">{t.deadline}: {item.deadline}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('agencyTracking', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('agencyTracking', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('agencyTracking', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('agencyTracking', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1063,15 +1103,15 @@ export default function App() {
             <SubSection title={t.studentRegistration} onAdd={() => openModal('studentRegistration', t.addRecord)}>
               <div className="space-y-3">
                 {studentRegistrations.map(item => (
-                  <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 relative group">
-                    <div className="text-sm font-bold text-slate-800 mb-1">{item.student}</div>
+                  <div key={item.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
+                    <div className="text-sm font-bold text-slate-200 mb-1">{item.student}</div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-400">{item.type}</span>
                       <span className="text-[10px] font-bold text-brand-green">{item.status}</span>
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('studentRegistration', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('studentRegistration', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('studentRegistration', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('studentRegistration', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1082,11 +1122,11 @@ export default function App() {
               <div className="space-y-3">
                 {classFormations.map(item => (
                   <div key={item.id} className="p-3 bg-yellow-50 rounded-xl border border-yellow-200 relative group">
-                    <div className="text-sm font-bold text-slate-800 mb-1">{item.title}</div>
+                    <div className="text-sm font-bold text-slate-200 mb-1">{item.title}</div>
                     <div className="text-xs font-bold text-brand-yellow">{item.status}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('classFormation', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('classFormation', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('classFormation', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('classFormation', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1098,17 +1138,17 @@ export default function App() {
                 {trialClasses.map(item => (
                   <div key={item.id} className="p-3 bg-blue-50 rounded-xl border border-blue-200 relative group">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-slate-800">{item.student}</span>
+                      <span className="text-sm font-bold text-slate-200">{item.student}</span>
                       <span className="text-[10px] font-bold text-brand-blue">{item.time}</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 mb-2">{t.channel}: {item.channel}</div>
+                    <div className="text-[10px] text-slate-400 mb-2">{t.channel}: {item.channel}</div>
                     <div className="flex gap-2">
                       {item.isArranged && <span className="text-[10px] font-bold bg-green-100 text-brand-green px-1.5 py-0.5 rounded">{t.isArranged}</span>}
                       {item.isFollowUp && <span className="text-[10px] font-bold bg-yellow-100 text-brand-yellow px-1.5 py-0.5 rounded">{t.isFollowUp}</span>}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('trialClass', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('trialClass', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('trialClass', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('trialClass', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1118,16 +1158,16 @@ export default function App() {
             <SubSection title={t.studentExams} onAdd={() => openModal('studentExam', t.addRecord)}>
               <div className="space-y-3">
                 {studentExams.map(item => (
-                  <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 relative group">
+                  <div key={item.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-slate-800">{item.student}</span>
+                      <span className="text-sm font-bold text-slate-200">{item.student}</span>
                       <span className="text-[10px] font-bold text-brand-blue">{item.date}</span>
                     </div>
-                    <div className="text-xs font-bold text-slate-700 mb-1">{item.examName}</div>
+                    <div className="text-xs font-bold text-slate-300 mb-1">{item.examName}</div>
                     <div className="text-[10px] text-brand-red font-bold">{t.score}: {item.score}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('studentExam', t.editRecord, item, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('studentExam', item.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('studentExam', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('studentExam', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1142,18 +1182,18 @@ export default function App() {
             <SubSection title={t.todayMediaProduction} onAdd={() => openModal('mediaOperation', t.addRecord)}>
               <div className="space-y-4">
                 {mediaOperations.map(op => (
-                  <div key={op.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 relative group">
-                    <h4 className="text-sm font-bold text-slate-800 mb-2">{t.content}：{op.content}</h4>
+                  <div key={op.id} className="p-4 bg-slate-950/50 rounded-xl border border-white/10 relative group">
+                    <h4 className="text-sm font-bold text-slate-200 mb-2">{t.content}：{op.content}</h4>
                     <div className="flex flex-wrap gap-2">
                       {op.platforms.map(p => (
-                        <span key={p} className="text-[10px] font-bold bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-600">
+                        <span key={p} className="text-[10px] font-bold bg-slate-800/40 border border-white/10 px-2 py-1 rounded-full text-slate-400">
                           {p}
                         </span>
                       ))}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('mediaOperation', t.editRecord, op, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('mediaOperation', op.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('mediaOperation', t.editRecord, op, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('mediaOperation', op.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1185,7 +1225,7 @@ export default function App() {
               <div className="space-y-3">
                 {salesConversion.followUpCustomers.map((customer, idx) => (
                   <div key={idx} className="p-3 bg-yellow-50 rounded-xl border border-yellow-200 relative group">
-                    <div className="text-sm font-bold text-slate-800">{customer.name}</div>
+                    <div className="text-sm font-bold text-slate-200">{customer.name}</div>
                     <div className="text-xs font-bold text-brand-yellow">{customer.status}</div>
                     <button 
                       onClick={() => setSalesConversion(prev => ({ ...prev, followUpCustomers: prev.followUpCustomers.filter((_, i) => i !== idx) }))}
@@ -1201,8 +1241,8 @@ export default function App() {
             <SubSection title={t.collaboration} onAdd={() => openModal('collaboration', t.addRecord)}>
               <div className="space-y-3">
                 {salesConversion.collaborations.map((collab, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 relative group">
-                    <p className="text-xs font-bold text-slate-700 mb-2">{collab.task}</p>
+                  <div key={idx} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
+                    <p className="text-xs font-bold text-slate-300 mb-2">{collab.task}</p>
                     <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold">
                       <span>{t.from}: {collab.from}</span>
                       <span>{t.to}: {collab.to}</span>
@@ -1224,27 +1264,27 @@ export default function App() {
         <SectionBlock title={t.financeRecords} icon={<CreditCard className="w-6 h-6" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {financeRecords.map(record => (
-              <div key={record.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center gap-4 relative group">
+              <div key={record.id} className="p-4 bg-slate-800/40 border border-white/10 rounded-xl shadow-lg shadow-black/20 flex items-center gap-4 relative group">
                 <div className={cn(
                   "w-10 h-10 rounded-full flex items-center justify-center",
-                  record.type === '应收款' ? "bg-red-50 text-brand-red" : "bg-green-50 text-brand-green"
+                  record.type === '应收款' ? "bg-brand-red/10 text-brand-red" : "bg-green-50 text-brand-green"
                 )}>
                   {record.type === '应收款' ? <AlertCircle className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                 </div>
                 <div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">{record.type === '应收款' ? t.receivable : t.invoice}</div>
-                  <div className="text-lg font-bold text-slate-900">¥{record.amount}</div>
-                  <div className="text-[10px] text-slate-500">{record.detail}</div>
+                  <div className="text-lg font-bold text-slate-100">¥{record.amount}</div>
+                  <div className="text-[10px] text-slate-400">{record.detail}</div>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openModal('financeRecord', t.editRecord, record, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                  <button onClick={() => handleDelete('financeRecord', record.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => openModal('financeRecord', t.editRecord, record, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                  <button onClick={() => handleDelete('financeRecord', record.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
             ))}
             <button 
               onClick={() => openModal('financeRecord', t.addRecord)}
-              className="p-4 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-blue hover:text-brand-blue transition-all"
+              className="p-4 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-blue hover:text-brand-blue transition-all"
             >
               <Plus className="w-6 h-6" />
               <span className="text-xs font-bold">{t.addRecord}</span>
@@ -1259,7 +1299,7 @@ export default function App() {
               value={cooperationNote}
               onChange={(e) => setCooperationNote(e.target.value)}
               placeholder={t.cooperationPlaceholder}
-              className="w-full h-32 p-4 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800-10 transition-all resize-none"
+              className="w-full h-32 p-4 bg-slate-800/40 text-slate-100 border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800/10 transition-all resize-none"
             />
           </SectionBlock>
 
@@ -1267,8 +1307,8 @@ export default function App() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 {bossInstructions.map((inst, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 group">
-                    <span className="flex-1 text-sm font-bold text-slate-800">{inst}</span>
+                  <div key={idx} className="flex items-center gap-2 bg-slate-950/50 p-3 rounded-xl border border-white/10 group">
+                    <span className="flex-1 text-sm font-bold text-slate-200">{inst}</span>
                     <button 
                       onClick={() => setBossInstructions(prev => prev.filter((_, i) => i !== idx))}
                       className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-red transition-all"
@@ -1283,7 +1323,7 @@ export default function App() {
                   id="new-instruction"
                   type="text" 
                   placeholder={lang === 'zh' ? "输入新指令..." : "Inserisci nuova istruzione..."}
-                  className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800-10"
+                  className="flex-1 px-4 py-2 bg-slate-800/40 text-slate-100 border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800/10"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const val = (e.target as HTMLInputElement).value;
@@ -1302,7 +1342,7 @@ export default function App() {
                       input.value = '';
                     }
                   }}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors"
+                  className="px-4 py-2 bg-slate-900 text-slate-100 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors"
                 >
                   {t.add}
                 </button>
@@ -1315,21 +1355,21 @@ export default function App() {
         <SectionBlock title={t.offlineVisits} icon={<UserPlus className="w-6 h-6" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {offlineVisits.map(visit => (
-              <div key={visit.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm relative group">
+              <div key={visit.id} className="p-4 bg-slate-800/40 border border-white/10 rounded-xl shadow-lg shadow-black/20 relative group">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-slate-900">{visit.visitor}</span>
+                  <span className="text-sm font-bold text-slate-100">{visit.visitor}</span>
                   <span className="text-xs font-bold text-brand-blue">{visit.time}</span>
                 </div>
-                <p className="text-xs text-slate-500">{t.purposeLabel}{visit.purpose}</p>
+                <p className="text-xs text-slate-400">{t.purposeLabel}{visit.purpose}</p>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openModal('offlineVisit', t.editRecord, visit, true)} className="p-1 bg-white rounded shadow-sm hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                  <button onClick={() => handleDelete('offlineVisit', visit.id)} className="p-1 bg-white rounded shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => openModal('offlineVisit', t.editRecord, visit, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
+                  <button onClick={() => handleDelete('offlineVisit', visit.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
             ))}
             <button 
               onClick={() => openModal('offlineVisit', t.addRecord)}
-              className="p-4 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-blue hover:text-brand-blue transition-all"
+              className="p-4 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-blue hover:text-brand-blue transition-all"
             >
               <Plus className="w-6 h-6" />
               <span className="text-xs font-bold">{t.addVisit}</span>
@@ -1340,15 +1380,15 @@ export default function App() {
 
       {/* Modal */}
       {isModalOpen && modalConfig && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900-60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            className="bg-slate-800/40 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
           >
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="text-xl font-serif font-bold text-slate-900">{modalConfig.title}</h3>
-              <button onClick={closeModal} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
+              <h3 className="text-xl font-serif font-bold text-slate-100">{modalConfig.title}</h3>
+              <button onClick={closeModal} className="p-1 hover:bg-slate-700 rounded-full transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1474,13 +1514,35 @@ export default function App() {
                   <Input label={t.score} name="score" required defaultValue={modalConfig.data?.score || ''} />
                 </>
               )}
+              {modalConfig.type === 'exportExcel' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-slate-300">开始日期</label>
+                    <input 
+                      type="date" 
+                      value={exportStartDate.toLocaleDateString('en-CA')}
+                      onChange={(e) => setExportStartDate(new Date(e.target.value))}
+                      className="w-full px-4 py-3 bg-slate-950/50 text-slate-100 rounded-xl border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-bold text-slate-300">结束日期</label>
+                    <input 
+                      type="date" 
+                      value={exportEndDate.toLocaleDateString('en-CA')}
+                      onChange={(e) => setExportEndDate(new Date(e.target.value))}
+                      className="w-full px-4 py-3 bg-slate-950/50 text-slate-100 rounded-xl border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              )}
               {modalConfig.type === 'clearAll' && (
-                <div className="py-4 text-center text-slate-700 font-medium">
+                <div className="py-4 text-center text-slate-300 font-medium">
                   {t.confirmClearAll}
                 </div>
               )}
               {modalConfig.type === 'confirmDelete' && (
-                <div className="py-4 text-center text-slate-700 font-medium">
+                <div className="py-4 text-center text-slate-300 font-medium">
                   {t.confirmDelete}
                 </div>
               )}
@@ -1489,20 +1551,20 @@ export default function App() {
                 <button 
                   type="button" 
                   onClick={closeModal}
-                  className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-slate-800/80 text-slate-400 rounded-xl font-bold hover:bg-slate-700 transition-colors"
                 >
                   {t.cancel}
                 </button>
                 <button 
                   type="submit"
                   className={cn(
-                    "flex-1 px-4 py-2.5 text-white rounded-xl font-bold transition-colors shadow-lg",
+                    "flex-1 px-4 py-2.5 text-slate-100 rounded-xl font-bold transition-colors shadow-lg",
                     (modalConfig.type === 'clearAll' || modalConfig.type === 'confirmDelete')
-                      ? "bg-red-600 hover:bg-red-700" 
-                      : "bg-brand-blue hover:bg-blue-600"
+                      ? "bg-brand-red hover:bg-brand-red/80" 
+                      : "bg-brand-blue hover:bg-brand-blue"
                   )}
                 >
-                  {modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : t.save}
+                  {modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : modalConfig.type === 'exportExcel' ? t.exportExcel : t.save}
                 </button>
               </div>
             </form>
@@ -1511,14 +1573,14 @@ export default function App() {
       )}
       
       {/* Footer / Employee List */}
-      <footer className="bg-slate-900 text-white p-8 mt-12">
+      <footer className="bg-slate-900 text-slate-100 p-8 mt-12">
         <div className="max-w-6xl mx-auto">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
             <Users className="w-4 h-4" /> {t.teamMembers}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
             {EMPLOYEES.map(emp => (
-              <div key={emp} className="flex flex-col items-center gap-2 p-3 bg-white-5 rounded-xl border border-white-10">
+              <div key={emp} className="flex flex-col items-center gap-2 p-3 bg-slate-800/50 rounded-xl border border-white/10">
                 <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center font-bold text-xs">
                   {emp.split(' ')[0][0]}{emp.split(' ')[1]?.[0] || ''}
                 </div>
@@ -1526,7 +1588,7 @@ export default function App() {
               </div>
             ))}
           </div>
-          <div className="mt-8 pt-8 border-t border-white-10 text-center text-[10px] text-slate-500 font-bold">
+          <div className="mt-8 pt-8 border-t border-white/10 text-center text-[10px] text-slate-400 font-bold">
             {t.footerText}
           </div>
         </div>
@@ -1571,14 +1633,14 @@ function SubSection({ title, children, onAdd }: SubSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
           <div className="w-1.5 h-4 bg-brand-blue rounded-full" />
           {title}
         </h3>
         {onAdd && (
           <button 
             onClick={onAdd}
-            className="p-1 hover:bg-slate-100 rounded-lg text-brand-blue transition-colors"
+            className="p-1 hover:bg-slate-800/80 rounded-lg text-brand-blue transition-colors"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -1595,14 +1657,14 @@ function SubSection({ title, children, onAdd }: SubSectionProps) {
 function Input({ label, name, defaultValue, required, placeholder, type = "text" }: { label: string; name: string; defaultValue?: string; required?: boolean; placeholder?: string; type?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-slate-500">{label}</label>
+      <label className="text-xs font-bold text-slate-400">{label}</label>
       <input 
         type={type}
         name={name}
         defaultValue={defaultValue}
         required={required}
         placeholder={placeholder}
-        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-20 transition-all"
+        className="w-full px-3 py-2 bg-slate-950/50 text-slate-100 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
       />
     </div>
   );
@@ -1611,11 +1673,11 @@ function Input({ label, name, defaultValue, required, placeholder, type = "text"
 function Select({ label, name, options, defaultValue }: { label: string; name: string; options: (string | { label: string; value: string })[]; defaultValue?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-slate-500">{label}</label>
+      <label className="text-xs font-bold text-slate-400">{label}</label>
       <select 
         name={name}
         defaultValue={defaultValue}
-        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-20 transition-all"
+        className="w-full px-3 py-2 bg-slate-950/50 text-slate-100 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
       >
         {options.map(opt => {
           const value = typeof opt === 'string' ? opt : opt.value;
@@ -1634,9 +1696,9 @@ function Checkbox({ label, name, defaultChecked }: { label: string; name: string
         type="checkbox" 
         name={name}
         defaultChecked={defaultChecked}
-        className="w-4 h-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+        className="w-4 h-4 rounded border-white/10 bg-slate-950/50 text-brand-blue focus:ring-brand-blue"
       />
-      <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{label}</span>
+      <span className="text-xs font-bold text-slate-400 group-hover:text-slate-100 transition-colors">{label}</span>
     </label>
   );
 }
