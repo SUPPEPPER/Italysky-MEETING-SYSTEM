@@ -78,7 +78,8 @@ import {
   INITIAL_FINANCE_RECORDS,
   INITIAL_OFFLINE_VISITS,
   INITIAL_STUDENT_EXAMS,
-  EMPTY_ARRAY
+  EMPTY_ARRAY,
+  MEDIA_ACCOUNTS
 } from './constants';
 import { Language, translations } from './translations';
 
@@ -326,6 +327,14 @@ export default function App() {
           setAgencyTracking(prevAgency);
         }
       }
+
+      // 9. Initialize Media Lists if empty
+      if (yesterdayMedia.length === 0) {
+        setYesterdayMedia(INITIAL_YESTERDAY_MEDIA);
+      }
+      if (mediaOperations.length === 0) {
+        setMediaOperations(INITIAL_MEDIA_OPERATIONS);
+      }
     };
 
     carryOverData();
@@ -399,12 +408,12 @@ export default function App() {
         setYesterdayClasses(prev => [...prev, newItem]);
       }
     } else if (modalConfig.type === 'yesterdayMedia') {
-      const newItem = {
+      const newItem: MediaRecord = {
         id: modalConfig.isEdit ? modalConfig.data.id : Math.random().toString(36).substr(2, 9),
         platform: data.platform as any,
         accountName: data.accountName as string,
-        content: data.content as string,
-        data: data.data as string,
+        views: (data.views as string) || '',
+        followers: (data.followers as string) || '',
       };
       if (modalConfig.isEdit) {
         setYesterdayMedia(prev => prev.map(i => i.id === newItem.id ? newItem : i));
@@ -487,10 +496,11 @@ export default function App() {
         setTrialClasses(prev => [...prev, newItem]);
       }
     } else if (modalConfig.type === 'mediaOperation') {
-      const newItem = {
+      const newItem: MediaOperation = {
         id: modalConfig.isEdit ? modalConfig.data.id : Math.random().toString(36).substr(2, 9),
+        accountName: data.accountName as string,
+        platform: data.platform as string,
         content: data.content as string,
-        platforms: (data.platforms as string).split(',').map(p => p.trim()),
       };
       if (modalConfig.isEdit) {
         setMediaOperations(prev => prev.map(i => i.id === newItem.id ? newItem : i));
@@ -671,7 +681,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950/50 font-sans" ref={dashboardRef}>
+    <div className="min-h-screen bg-[#FDFCFB] font-sans" ref={dashboardRef}>
       {dbError && (
         <div className="bg-brand-red text-white p-4 text-sm text-center shadow-2xl relative z-[60] font-bold">
           <div className="max-w-6xl mx-auto flex items-center justify-center gap-4">
@@ -848,23 +858,43 @@ export default function App() {
             </SubSection>
 
             {/* Yesterday Media */}
-            <SubSection title={t.yesterdayMedia} onAdd={() => openModal('yesterdayMedia', t.addRecord)}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {yesterdayMedia.map(media => (
-                  <div key={media.id} className="p-4 bg-white border border-slate-200 rounded-none relative group hover:border-brand-black transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-brand-white bg-brand-black px-2 py-1 rounded-none uppercase">
-                        {media.platform}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-400">{media.accountName}</span>
+            <SubSection title={t.yesterdayMedia}>
+              <div className="grid grid-cols-1 gap-4">
+                {yesterdayMedia.map((media, idx) => (
+                  <div key={media.id} className="p-4 bg-white border border-slate-200 rounded-none flex flex-col sm:flex-row sm:items-center gap-4 hover:border-brand-black transition-colors">
+                    <div className="w-full sm:w-1/3">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">{media.platform}</div>
+                      <div className="text-sm font-bold text-brand-black font-serif">{media.accountName}</div>
                     </div>
-                    <p className="text-sm font-bold text-brand-black mb-2">{media.content}</p>
-                    <div className="text-xs text-slate-500 font-mono bg-slate-50 p-2 rounded-none border border-slate-100">
-                      {media.data}
-                    </div>
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('yesterdayMedia', t.editRecord, media, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('yesterdayMedia', media.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                    <div className="flex-1 grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.views}</label>
+                        <input 
+                          type="text"
+                          value={media.views || ''}
+                          onChange={(e) => {
+                            const newList = [...yesterdayMedia];
+                            newList[idx] = { ...newList[idx], views: e.target.value };
+                            setYesterdayMedia(newList);
+                          }}
+                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 text-xs font-bold focus:outline-none focus:border-brand-black"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.followers}</label>
+                        <input 
+                          type="text"
+                          value={media.followers || ''}
+                          onChange={(e) => {
+                            const newList = [...yesterdayMedia];
+                            newList[idx] = { ...newList[idx], followers: e.target.value };
+                            setYesterdayMedia(newList);
+                          }}
+                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-100 text-xs font-bold focus:outline-none focus:border-brand-black"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1151,25 +1181,34 @@ export default function App() {
           </div>
         </SectionBlock>
 
-        {/* Section 4: Media Accounts */}
-        <SectionBlock title={lang === 'zh' ? "媒体账号" : "Account Media"} icon={<TrendingUp className="w-6 h-6" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { platform: '公众号', name: '@意国蓝天', icon: <MessageSquare className="w-4 h-4" /> },
-              { platform: '视频号', name: '@意国蓝天情报局', icon: <Youtube className="w-4 h-4" /> },
-              { platform: '视频号', name: '@意国蓝天的小日记', icon: <Youtube className="w-4 h-4" /> },
-              { platform: '视频号', name: '@真的徐小翔', icon: <Youtube className="w-4 h-4" /> },
-              { platform: '视频号', name: '@徐大梨', icon: <Youtube className="w-4 h-4" /> },
-              { platform: '小红书', name: '@意小乖', icon: <Instagram className="w-4 h-4" /> },
-              { platform: '小红书', name: '@意国蓝天大梨教育', icon: <Instagram className="w-4 h-4" /> }
-            ].map((account, idx) => (
-              <div key={idx} className="p-5 bg-white border border-slate-200 rounded-none flex items-center gap-5 hover:border-brand-black transition-all group">
-                <div className="w-12 h-12 bg-brand-black text-brand-white flex items-center justify-center rounded-none group-hover:bg-brand-red transition-colors">
-                  {account.icon}
+        {/* Section 4: Today Media Production */}
+        <SectionBlock title={t.todayMediaProduction} icon={<TrendingUp className="w-6 h-6" />}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {mediaOperations.map((media, idx) => (
+              <div key={media.id} className="p-5 bg-white border border-slate-200 rounded-none flex flex-col gap-4 hover:border-brand-black transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-brand-black text-brand-white flex items-center justify-center rounded-none group-hover:bg-brand-red transition-colors">
+                    {media.platform === '公众号' ? <MessageSquare className="w-4 h-4" /> : 
+                     media.platform === '视频号' ? <Youtube className="w-4 h-4" /> : 
+                     <Instagram className="w-4 h-4" />}
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">{media.platform}</div>
+                    <div className="text-sm font-bold text-brand-black font-serif">{media.accountName}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">{account.platform}</div>
-                  <div className="text-sm font-bold text-brand-black font-serif">{account.name}</div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{t.publishedContent}</label>
+                  <textarea 
+                    value={media.content || ''}
+                    onChange={(e) => {
+                      const newList = [...mediaOperations];
+                      newList[idx] = { ...newList[idx], content: e.target.value };
+                      setMediaOperations(newList);
+                    }}
+                    className="w-full px-4 py-3 bg-slate-50 text-brand-black border border-slate-100 rounded-none text-sm font-bold focus:outline-none focus:border-brand-black transition-all placeholder:text-slate-300 placeholder:font-normal min-h-[80px] resize-none"
+                    placeholder={lang === 'zh' ? "输入今日发布内容..." : "Inserisci il contenuto di oggi..."}
+                  />
                 </div>
               </div>
             ))}

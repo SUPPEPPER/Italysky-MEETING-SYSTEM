@@ -19,10 +19,10 @@ export interface YesterdayClass {
 
 export interface MediaRecord {
   id: string;
-  platform: '小红书' | '视频号' | '公众号' | '抖音';
+  platform: string;
   accountName: string;
-  content: string;
-  data: string;
+  views: string;
+  followers: string;
 }
 
 export interface TodayClass {
@@ -66,8 +66,9 @@ export interface TrialClass {
 
 export interface MediaOperation {
   id: string;
+  accountName: string;
+  platform: string;
   content: string;
-  platforms: string[];
 }
 
 export interface SalesConversion {
