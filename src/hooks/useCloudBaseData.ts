@@ -42,18 +42,17 @@ export function useCloudBaseData<T>(
       }
       setIsInitialized(true);
     }).catch((err: any) => {
-      console.error(`Failed to fetch ${key} from CloudBase.`, err);
-      if (err.message === 'network request error') {
+      // Only show error if it's a real network error and we haven't shown it yet
+      if (err.message === 'network request error' || err.code === 'NETWORK_ERROR') {
+        console.error(`Failed to fetch ${key} from CloudBase.`, err);
         if (!hasShownDbError && dbErrorCallback) {
           hasShownDbError = true;
           dbErrorCallback(true);
+          // Auto-hide after 10 seconds to avoid annoying the user if it's transient
+          setTimeout(() => {
+            if (dbErrorCallback) dbErrorCallback(false);
+          }, 10000);
         }
-        console.error(`
-[CloudBase Database Error] "network request error" usually means:
-1. The VITE_TCB_REGION in your .env file is incorrect (default is ap-shanghai, but yours might be ap-guangzhou, ap-beijing, etc.).
-2. The Database service is not enabled in your CloudBase environment.
-3. Your web domain (e.g., localhost:3000) is not added to the "Web Security Domains" (安全应用来源) in the CloudBase console.
-        `);
       }
       setData(initialValue);
       setDocExists(false);
@@ -74,9 +73,13 @@ export function useCloudBaseData<T>(
       
       docRef.get().then((res: any) => {
         if (res.data && res.data.length > 0) {
-          docRef.update({ value: valueToStore }).catch(console.error);
+          docRef.update({ value: valueToStore })
+            .then(() => setDocExists(true))
+            .catch(console.error);
         } else {
-          docRef.set({ value: valueToStore }).catch(console.error);
+          docRef.set({ value: valueToStore })
+            .then(() => setDocExists(true))
+            .catch(console.error);
         }
       }).catch(console.error);
 

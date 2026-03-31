@@ -260,12 +260,13 @@ export default function App() {
       // 1. Carry over todayClasses to yesterdayClasses (Review)
       if (!docExists1) {
         const prevTodayClasses = await fetchYesterday('todayClasses');
-        if (prevTodayClasses && prevTodayClasses.length > 0) {
+        if (prevTodayClasses && Array.isArray(prevTodayClasses) && prevTodayClasses.length > 0) {
           const mapped = prevTodayClasses.map((c: any) => ({
             id: c.id,
             name: c.name,
             teacher: c.teacher,
             feedbackCompleted: false,
+            absentStudents: '',
             remarks: c.remarks || ''
           }));
           setYesterdayClasses(mapped);
@@ -275,7 +276,7 @@ export default function App() {
       // 2. Carry over Finance Records (Accounts Receivable and Invoices)
       if (!docExists10) {
         const prevFinance = await fetchYesterday('financeRecords');
-        if (prevFinance && prevFinance.length > 0) {
+        if (prevFinance && Array.isArray(prevFinance) && prevFinance.length > 0) {
           setFinanceRecords(prevFinance);
         }
       }
@@ -283,7 +284,7 @@ export default function App() {
       // 3. Carry over Boss Instructions
       if (!docExists15) {
         const prevInstructions = await fetchYesterday('bossInstructions');
-        if (prevInstructions && prevInstructions.length > 0) {
+        if (prevInstructions && Array.isArray(prevInstructions) && prevInstructions.length > 0) {
           setBossInstructions(prevInstructions);
         }
       }
@@ -299,7 +300,7 @@ export default function App() {
       // 5. Carry over Student Exams
       if (!docExists16) {
         const prevExams = await fetchYesterday('studentExams');
-        if (prevExams && prevExams.length > 0) {
+        if (prevExams && Array.isArray(prevExams) && prevExams.length > 0) {
           setStudentExams(prevExams);
         }
       }
@@ -307,7 +308,7 @@ export default function App() {
       // 6. Carry over Student Registrations
       if (!docExists5) {
         const prevRegs = await fetchYesterday('studentRegistrations');
-        if (prevRegs && prevRegs.length > 0) {
+        if (prevRegs && Array.isArray(prevRegs) && prevRegs.length > 0) {
           setStudentRegistrations(prevRegs);
         }
       }
@@ -315,7 +316,7 @@ export default function App() {
       // 7. Carry over Trial Classes
       if (!docExists7) {
         const prevTrials = await fetchYesterday('trialClasses');
-        if (prevTrials && prevTrials.length > 0) {
+        if (prevTrials && Array.isArray(prevTrials) && prevTrials.length > 0) {
           setTrialClasses(prevTrials);
         }
       }
@@ -323,7 +324,7 @@ export default function App() {
       // 8. Carry over Agency Tracking
       if (!docExists4) {
         const prevAgency = await fetchYesterday('agencyTracking');
-        if (prevAgency && prevAgency.length > 0) {
+        if (prevAgency && Array.isArray(prevAgency) && prevAgency.length > 0) {
           setAgencyTracking(prevAgency);
         }
       }
@@ -633,8 +634,15 @@ export default function App() {
           const docId = `dashboard_shared_${ds}_${key}`;
           try {
             const res = await db.collection('dashboard_data').doc(docId).get();
-            if (res.data && res.data.length > 0 && Array.isArray(res.data[0].value)) {
-              return res.data[0].value.map((item: any) => ({ Date: ds, Section: sectionName, ...item }));
+            if (res.data && res.data.length > 0) {
+              const val = res.data[0].value;
+              if (Array.isArray(val)) {
+                return val.map((item: any) => ({ Date: ds, Section: sectionName, ...item }));
+              } else if (typeof val === 'string' || typeof val === 'number') {
+                return [{ Date: ds, Section: sectionName, Value: val }];
+              } else if (val && typeof val === 'object') {
+                return [{ Date: ds, Section: sectionName, ...val }];
+              }
             }
           } catch (e) {
             console.error(`Error fetching ${key} for ${ds}:`, e);
@@ -642,13 +650,19 @@ export default function App() {
           return [];
         };
 
-        const [yClasses, tClasses, tList] = await Promise.all([
-          fetchCollection('yesterdayClasses', 'Yesterday Classes'),
-          fetchCollection('todayClasses', 'Today Schedule'),
-          fetchCollection('todoList', 'ToDo List')
+        const [yClasses, tClasses, tList, fRecords, sExams, sRegs, tTrials, aTracking, bInstructions] = await Promise.all([
+          fetchCollection('yesterdayClasses', '昨日复盘'),
+          fetchCollection('todayClasses', '今日课表'),
+          fetchCollection('todoList', '待办事项'),
+          fetchCollection('financeRecords', '财务记录'),
+          fetchCollection('studentExams', '学生考试'),
+          fetchCollection('studentRegistrations', '学生报名'),
+          fetchCollection('trialClasses', '试听追踪'),
+          fetchCollection('agencyTracking', '中介追踪'),
+          fetchCollection('bossInstructions', '老板指令')
         ]);
 
-        allData = [...allData, ...yClasses, ...tClasses, ...tList];
+        allData = [...allData, ...yClasses, ...tClasses, ...tList, ...fRecords, ...sExams, ...sRegs, ...tTrials, ...aTracking, ...bInstructions];
       }
 
       if (allData.length === 0) {
@@ -720,27 +734,11 @@ export default function App() {
             </button>
           </div>
 
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-slate-800/40 text-slate-400">或者</span>
-            </div>
+          <div className="mt-8 pt-6 border-t border-white/5">
+            <p className="text-xs text-slate-500 italic">
+              本平台为内部平台，请勿外传链接
+            </p>
           </div>
-
-          <div className="flex flex-col gap-4">
-            <button
-              type="button"
-              onClick={handleAnonymousLogin}
-              className="w-full py-3 px-4 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
-            >
-              匿名体验 (测试用)
-            </button>
-          </div>
-          <p className="mt-6 text-xs text-slate-400">
-            请确保已在腾讯云控制台开启“匿名登录”并创建了 app_users 集合
-          </p>
         </div>
       </div>
     );
