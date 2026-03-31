@@ -20,35 +20,45 @@ export function useCloudBaseData<T>(
   const [docExists, setDocExists] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    setIsInitialized(false);
+    setDocExists(false);
+
     if (!userId) {
       setData(initialValue);
       setIsInitialized(true);
       return;
     }
 
-    // 使用固定的前缀 shared_ 代替 userId，这样所有人看到的数据都是一样的
     const docId = dateString ? `dashboard_shared_${dateString}_${key}` : `dashboard_shared_global_${key}`;
     const collectionName = 'dashboard_data';
 
     const docRef = db.collection(collectionName).doc(docId);
     
     docRef.get().then((res: any) => {
-      if (res.data && res.data.length > 0) {
-        setData(res.data[0].value ?? initialValue);
-        setDocExists(true);
+      if (!isMounted) return;
+      const data = res.data;
+      if (data) {
+        const value = Array.isArray(data) ? (data.length > 0 ? data[0].value : null) : data.value;
+        if (value !== undefined && value !== null) {
+          setData(value);
+          setDocExists(true);
+        } else {
+          setData(initialValue);
+          setDocExists(false);
+        }
       } else {
         setData(initialValue);
         setDocExists(false);
       }
       setIsInitialized(true);
     }).catch((err: any) => {
-      // Only show error if it's a real network error and we haven't shown it yet
+      if (!isMounted) return;
       if (err.message === 'network request error' || err.code === 'NETWORK_ERROR') {
         console.error(`Failed to fetch ${key} from CloudBase.`, err);
         if (!hasShownDbError && dbErrorCallback) {
           hasShownDbError = true;
           dbErrorCallback(true);
-          // Auto-hide after 10 seconds to avoid annoying the user if it's transient
           setTimeout(() => {
             if (dbErrorCallback) dbErrorCallback(false);
           }, 10000);
@@ -59,6 +69,9 @@ export function useCloudBaseData<T>(
       setIsInitialized(true);
     });
 
+    return () => {
+      isMounted = false;
+    };
   }, [key, dateString, userId, initialValue]);
 
   const updateData = useCallback((newValue: T | ((prev: T) => T)) => {
@@ -71,17 +84,11 @@ export function useCloudBaseData<T>(
       
       const docRef = db.collection(collectionName).doc(docId);
       
-      docRef.get().then((res: any) => {
-        if (res.data && res.data.length > 0) {
-          docRef.update({ value: valueToStore })
-            .then(() => setDocExists(true))
-            .catch(console.error);
-        } else {
-          docRef.set({ value: valueToStore })
-            .then(() => setDocExists(true))
-            .catch(console.error);
-        }
-      }).catch(console.error);
+      // Use set directly for faster and more reliable updates
+      // Since we store the entire state in the 'value' field, set() is appropriate
+      docRef.set({ value: valueToStore })
+        .then(() => setDocExists(true))
+        .catch(console.error);
 
       return valueToStore;
     });

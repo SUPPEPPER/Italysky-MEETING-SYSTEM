@@ -92,10 +92,17 @@ export default function App() {
   const [lang, setLang] = useCloudBaseData<Language>('lang', 'zh', user?.uid);
   const t = translations[lang];
 
+  // Format date to YYYY-MM-DD manually to avoid locale issues
+  const formatDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // Format date to YYYY-MM-DD in local time
-  const dateString = currentDate.toLocaleDateString('en-CA');
+  const dateString = formatDate(currentDate);
 
   const [cooperationNote, setCooperationNote, init13, docExists13] = useCloudBaseData('cooperationNote', '', user?.uid, dateString);
   const [yesterdayClasses, setYesterdayClasses, init1, docExists1] = useCloudBaseData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid, dateString);
@@ -235,110 +242,144 @@ export default function App() {
     setUser(null);
   };
 
+  const isProcessingCarryOver = useRef<string | null>(null);
+
   useEffect(() => {
+    let isMounted = true;
     const carryOverData = async () => {
-      if (!user || !isDataLoaded) return;
+      if (!user || !isDataLoaded) {
+        return;
+      }
+
+      // Prevent parallel runs for the same date
+      if (isProcessingCarryOver.current === dateString) {
+        return;
+      }
+      isProcessingCarryOver.current = dateString;
 
       const yesterdayDate = new Date(currentDate);
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-      const yesterdayDateString = yesterdayDate.toLocaleDateString('en-CA');
+      const yesterdayDateString = formatDate(yesterdayDate);
 
-      const fetchYesterday = async (key: string) => {
+      console.log(`[CarryOver] Checking carry-over for ${dateString}. Yesterday was ${yesterdayDateString}`);
+
+      const fetchYesterdayData = async (key: string) => {
         const docId = `dashboard_shared_${yesterdayDateString}_${key}`;
         try {
           const res = await db.collection('dashboard_data').doc(docId).get();
-          if (res.data && res.data.length > 0) {
-            return res.data[0].value;
+          const data = res.data as any;
+          if (data) {
+            // Handle both array and object formats
+            const value = Array.isArray(data) ? (data.length > 0 ? data[0].value : null) : data.value;
+            return value;
           }
         } catch (e) {
-          console.error(`Failed to fetch yesterday's ${key}`, e);
+          console.error(`[CarryOver] Error fetching ${key} for ${yesterdayDateString}:`, e);
         }
         return null;
       };
 
-      // 1. Carry over todayClasses to yesterdayClasses (Review)
+      // Define which keys we need from yesterday
+      const keysToFetch = [
+        'todayClasses',      // For mapping to yesterdayClasses
+        'financeRecords',    // Continuous
+        'agencyTracking',    // Continuous
+        'studentRegistrations', // Continuous
+        'classFormations',   // Continuous
+        'trialClasses',      // Continuous
+        'studentExams',      // Continuous
+        'offlineVisits',     // Continuous
+        'bossInstructions',  // Continuous
+        'cooperationNote',   // Continuous
+        'salesConversion'    // Continuous
+      ];
+
+      // Fetch all in parallel for efficiency
+      const results = await Promise.all(keysToFetch.map(key => fetchYesterdayData(key)));
+      
+      if (!isMounted || isProcessingCarryOver.current !== dateString) return;
+      
+      const yesterdayData: Record<string, any> = {};
+      keysToFetch.forEach((key, i) => {
+        yesterdayData[key] = results[i];
+      });
+
+      // 1. Today's Classes (Yesterday) -> Yesterday's Review (Today)
+      // Only if today's yesterdayClasses doesn't exist yet
       if (!docExists1) {
-        const prevTodayClasses = await fetchYesterday('todayClasses');
+        const prevTodayClasses = yesterdayData['todayClasses'];
         if (prevTodayClasses && Array.isArray(prevTodayClasses) && prevTodayClasses.length > 0) {
+          console.log(`[CarryOver] Mapping ${prevTodayClasses.length} todayClasses from ${yesterdayDateString} to yesterdayClasses for ${dateString}`);
           const mapped = prevTodayClasses.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            teacher: c.teacher,
+            id: c.id || Math.random().toString(36).substr(2, 9),
+            name: c.name || '',
+            teacher: c.teacher || '',
             feedbackCompleted: false,
             absentStudents: '',
-            remarks: c.remarks || ''
+            remarks: ''
           }));
           setYesterdayClasses(mapped);
         }
       }
 
-      // 2. Carry over Finance Records (Accounts Receivable and Invoices)
-      if (!docExists10) {
-        const prevFinance = await fetchYesterday('financeRecords');
-        if (prevFinance && Array.isArray(prevFinance) && prevFinance.length > 0) {
-          setFinanceRecords(prevFinance);
-        }
+      // 2. Continuous Tasks (Carry over if today's doc doesn't exist)
+      
+      // Finance Records
+      if (!docExists10 && yesterdayData['financeRecords'] && Array.isArray(yesterdayData['financeRecords']) && yesterdayData['financeRecords'].length > 0) {
+        console.log(`[CarryOver] Carrying over financeRecords from ${yesterdayDateString} to ${dateString}`);
+        setFinanceRecords(yesterdayData['financeRecords']);
       }
 
-      // 3. Carry over Boss Instructions
-      if (!docExists15) {
-        const prevInstructions = await fetchYesterday('bossInstructions');
-        if (prevInstructions && Array.isArray(prevInstructions) && prevInstructions.length > 0) {
-          setBossInstructions(prevInstructions);
-        }
+      // Academic Affairs (Agency Tracking, Registrations, etc.)
+      if (!docExists4 && yesterdayData['agencyTracking'] && Array.isArray(yesterdayData['agencyTracking']) && yesterdayData['agencyTracking'].length > 0) {
+        setAgencyTracking(yesterdayData['agencyTracking']);
+      }
+      if (!docExists5 && yesterdayData['studentRegistrations'] && Array.isArray(yesterdayData['studentRegistrations']) && yesterdayData['studentRegistrations'].length > 0) {
+        setStudentRegistrations(yesterdayData['studentRegistrations']);
+      }
+      if (!docExists6 && yesterdayData['classFormations'] && Array.isArray(yesterdayData['classFormations']) && yesterdayData['classFormations'].length > 0) {
+        setClassFormations(yesterdayData['classFormations']);
+      }
+      if (!docExists7 && yesterdayData['trialClasses'] && Array.isArray(yesterdayData['trialClasses']) && yesterdayData['trialClasses'].length > 0) {
+        setTrialClasses(yesterdayData['trialClasses']);
+      }
+      if (!docExists16 && yesterdayData['studentExams'] && Array.isArray(yesterdayData['studentExams']) && yesterdayData['studentExams'].length > 0) {
+        setStudentExams(yesterdayData['studentExams']);
+      }
+      if (!docExists11 && yesterdayData['offlineVisits'] && Array.isArray(yesterdayData['offlineVisits']) && yesterdayData['offlineVisits'].length > 0) {
+        setOfflineVisits(yesterdayData['offlineVisits']);
       }
 
-      // 4. Carry over Cooperation Note (Joint Programs)
-      if (!docExists13) {
-        const prevNote = await fetchYesterday('cooperationNote');
-        if (prevNote) {
-          setCooperationNote(prevNote);
-        }
+      // Other Continuous
+      if (!docExists15 && yesterdayData['bossInstructions'] && Array.isArray(yesterdayData['bossInstructions']) && yesterdayData['bossInstructions'].length > 0) {
+        setBossInstructions(yesterdayData['bossInstructions']);
+      }
+      if (!docExists13 && yesterdayData['cooperationNote']) {
+        setCooperationNote(yesterdayData['cooperationNote']);
+      }
+      if (!docExists9 && yesterdayData['salesConversion']) {
+        setSalesConversion(yesterdayData['salesConversion']);
       }
 
-      // 5. Carry over Student Exams
-      if (!docExists16) {
-        const prevExams = await fetchYesterday('studentExams');
-        if (prevExams && Array.isArray(prevExams) && prevExams.length > 0) {
-          setStudentExams(prevExams);
-        }
-      }
+      // 3. Initialize Media if empty (not necessarily carry over, just ensuring initial state)
+      // Check if all views/followers are empty to determine if it's "uninitialized"
+      const isMediaEmpty = yesterdayMedia.every(m => !m.views && !m.followers);
+      if (isMediaEmpty) setYesterdayMedia(INITIAL_YESTERDAY_MEDIA);
+      
+      const isOpsEmpty = mediaOperations.every(m => !m.content);
+      if (isOpsEmpty) setMediaOperations(INITIAL_MEDIA_OPERATIONS);
 
-      // 6. Carry over Student Registrations
-      if (!docExists5) {
-        const prevRegs = await fetchYesterday('studentRegistrations');
-        if (prevRegs && Array.isArray(prevRegs) && prevRegs.length > 0) {
-          setStudentRegistrations(prevRegs);
-        }
-      }
-
-      // 7. Carry over Trial Classes
-      if (!docExists7) {
-        const prevTrials = await fetchYesterday('trialClasses');
-        if (prevTrials && Array.isArray(prevTrials) && prevTrials.length > 0) {
-          setTrialClasses(prevTrials);
-        }
-      }
-
-      // 8. Carry over Agency Tracking
-      if (!docExists4) {
-        const prevAgency = await fetchYesterday('agencyTracking');
-        if (prevAgency && Array.isArray(prevAgency) && prevAgency.length > 0) {
-          setAgencyTracking(prevAgency);
-        }
-      }
-
-      // 9. Initialize Media Lists if empty
-      if (yesterdayMedia.length === 0) {
-        setYesterdayMedia(INITIAL_YESTERDAY_MEDIA);
-      }
-      if (mediaOperations.length === 0) {
-        setMediaOperations(INITIAL_MEDIA_OPERATIONS);
-      }
+      // Reset processing flag
+      isProcessingCarryOver.current = null;
     };
 
     carryOverData();
-  }, [currentDate, user, isDataLoaded]);
+
+    return () => {
+      isMounted = false;
+      isProcessingCarryOver.current = null;
+    };
+  }, [currentDate, user, isDataLoaded, docExists1, docExists4, docExists5, docExists6, docExists7, docExists9, docExists10, docExists11, docExists13, docExists15, docExists16]);
 
   const performanceData = [
     { name: 'Mon', value: 400 },
@@ -673,8 +714,8 @@ export default function App() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
         <div className="w-16 h-16 border-4 border-brand-black border-t-brand-red rounded-full animate-spin mb-6"></div>
         <div className="flex flex-col items-center">
-          <h1 className="text-4xl font-serif font-bold tracking-tighter text-brand-black mb-2">VOGUE</h1>
-          <p className="text-[10px] font-bold text-brand-red uppercase tracking-[0.4em]">LOADING SYSTEM</p>
+          <h1 className="text-4xl font-serif font-bold tracking-tighter text-brand-black mb-2">{t.brandName}</h1>
+          <p className="text-[10px] font-bold text-brand-red uppercase tracking-[0.4em]">{t.systemName}</p>
         </div>
       </div>
     );
@@ -814,16 +855,16 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Yesterday Classes */}
             <SubSection title={t.yesterdayClasses} onAdd={() => openModal('yesterdayClass', t.addRecord)}>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto border border-black">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-brand-black text-brand-white font-bold uppercase text-[10px] tracking-wider">
+                  <thead className="bg-black text-white font-bold uppercase text-xs tracking-widest">
                     <tr>
-                      <th className="px-4 py-3">{t.courseName}</th>
-                      <th className="px-4 py-3">{t.teacher}</th>
-                      <th className="px-4 py-3">{t.feedbackStatus}</th>
-                      <th className="px-4 py-3">{t.absentStudents}</th>
-                      <th className="px-4 py-3">{t.remarks}</th>
-                      <th className="px-4 py-3 text-right">{t.operation}</th>
+                      <th className="px-4 py-4 border-b border-black">{t.courseName}</th>
+                      <th className="px-4 py-4 border-b border-black">{t.teacher}</th>
+                      <th className="px-4 py-4 border-b border-black">{t.feedbackStatus}</th>
+                      <th className="px-4 py-4 border-b border-black">{t.absentStudents}</th>
+                      <th className="px-4 py-4 border-b border-black">{t.remarks}</th>
+                      <th className="px-4 py-4 border-b border-black text-right">{t.operation}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1625,15 +1666,14 @@ interface SubSectionProps {
 function SubSection({ title, children, onAdd }: SubSectionProps) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-brand-black flex items-center gap-2">
-          <div className="w-1.5 h-4 bg-brand-red rounded-none" />
+      <div className="flex items-center justify-between bg-black px-3 py-2 border-l-4 border-brand-red">
+        <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
           {title}
         </h3>
         {onAdd && (
           <button 
             onClick={onAdd}
-            className="p-1 hover:bg-slate-100 rounded-none text-brand-red transition-colors"
+            className="p-1 hover:bg-brand-red text-white transition-colors"
           >
             <Plus className="w-4 h-4" />
           </button>
