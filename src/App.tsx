@@ -91,7 +91,6 @@ export default function App() {
   const [lang, setLang] = useCloudBaseData<Language>('lang', 'zh', user?.uid);
   const t = translations[lang];
 
-  const [cooperationNote, setCooperationNote, init13] = useCloudBaseData('cooperationNote', '', user?.uid);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [exportStartDate, setExportStartDate] = useState(new Date());
   const [exportEndDate, setExportEndDate] = useState(new Date());
@@ -99,22 +98,25 @@ export default function App() {
   // Format date to YYYY-MM-DD in local time
   const dateString = currentDate.toLocaleDateString('en-CA');
 
-  const [yesterdayClasses, setYesterdayClasses, init1, docExists] = useCloudBaseData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid, dateString);
-  const [yesterdayMedia, setYesterdayMedia, init2] = useCloudBaseData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid, dateString);
-  const [todayClasses, setTodayClasses, init3] = useCloudBaseData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid, dateString);
-  const [agencyTracking, setAgencyTracking, init4] = useCloudBaseData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid, dateString);
-  const [studentRegistrations, setStudentRegistrations, init5] = useCloudBaseData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid, dateString);
-  const [classFormations, setClassFormations, init6] = useCloudBaseData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid, dateString);
-  const [trialClasses, setTrialClasses, init7] = useCloudBaseData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid, dateString);
-  const [mediaOperations, setMediaOperations, init8] = useCloudBaseData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid, dateString);
-  const [salesConversion, setSalesConversion, init9] = useCloudBaseData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid, dateString);
-  const [financeRecords, setFinanceRecords, init10] = useCloudBaseData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid);
-  const [offlineVisits, setOfflineVisits, init11] = useCloudBaseData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid, dateString);
-  const [studentExams, setStudentExams, init16] = useCloudBaseData<StudentExam[]>('studentExams', INITIAL_STUDENT_EXAMS, user?.uid, dateString);
+  const [cooperationNote, setCooperationNote, init13, docExists13] = useCloudBaseData('cooperationNote', '', user?.uid, dateString);
+  const [yesterdayClasses, setYesterdayClasses, init1, docExists1] = useCloudBaseData<YesterdayClass[]>('yesterdayClasses', INITIAL_YESTERDAY_CLASSES, user?.uid, dateString);
+  const [yesterdayMedia, setYesterdayMedia, init2, docExists2] = useCloudBaseData<MediaRecord[]>('yesterdayMedia', INITIAL_YESTERDAY_MEDIA, user?.uid, dateString);
+  const [todayClasses, setTodayClasses, init3, docExists3] = useCloudBaseData<TodayClass[]>('todayClasses', INITIAL_TODAY_CLASSES, user?.uid, dateString);
+  const [agencyTracking, setAgencyTracking, init4, docExists4] = useCloudBaseData<AgencyTracking[]>('agencyTracking', INITIAL_AGENCY_TRACKING, user?.uid, dateString);
+  const [studentRegistrations, setStudentRegistrations, init5, docExists5] = useCloudBaseData<StudentRegistration[]>('studentRegistrations', INITIAL_STUDENT_REGISTRATIONS, user?.uid, dateString);
+  const [classFormations, setClassFormations, init6, docExists6] = useCloudBaseData<ClassFormation[]>('classFormations', INITIAL_CLASS_FORMATIONS, user?.uid, dateString);
+  const [trialClasses, setTrialClasses, init7, docExists7] = useCloudBaseData<TrialClass[]>('trialClasses', INITIAL_TRIAL_CLASSES, user?.uid, dateString);
+  const [mediaOperations, setMediaOperations, init8, docExists8] = useCloudBaseData<MediaOperation[]>('mediaOperations', INITIAL_MEDIA_OPERATIONS, user?.uid, dateString);
+  const [salesConversion, setSalesConversion, init9, docExists9] = useCloudBaseData<SalesConversion>('salesConversion', INITIAL_SALES_CONVERSION, user?.uid, dateString);
+  const [financeRecords, setFinanceRecords, init10, docExists10] = useCloudBaseData<FinanceRecord[]>('financeRecords', INITIAL_FINANCE_RECORDS, user?.uid, dateString);
+  const [offlineVisits, setOfflineVisits, init11, docExists11] = useCloudBaseData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid, dateString);
+  const [studentExams, setStudentExams, init16, docExists16] = useCloudBaseData<StudentExam[]>('studentExams', INITIAL_STUDENT_EXAMS, user?.uid, dateString);
 
-  const [redList, setRedList, init14] = useCloudBaseData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
-  const [bossInstructions, setBossInstructions, init15] = useCloudBaseData<string[]>('bossInstructions', [], user?.uid);
-  const [todoList, setTodoList, init12] = useCloudBaseData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid, dateString);
+  const [redList, setRedList, init14, docExists14] = useCloudBaseData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
+  const [bossInstructions, setBossInstructions, init15, docExists15] = useCloudBaseData<string[]>('bossInstructions', [], user?.uid, dateString);
+  const [todoList, setTodoList, init12, docExists12] = useCloudBaseData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid, dateString);
+
+  const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15 && init16;
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -235,36 +237,100 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (init1 && !docExists && user) {
-      // Fetch yesterday's todayClasses
+    const carryOverData = async () => {
+      if (!user || !isDataLoaded) return;
+
       const yesterdayDate = new Date(currentDate);
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
       const yesterdayDateString = yesterdayDate.toLocaleDateString('en-CA');
-      
-      const storageKey = `dashboard_${yesterdayDateString}_todayClasses`;
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
+
+      const fetchYesterday = async (key: string) => {
+        const docId = `dashboard_shared_${yesterdayDateString}_${key}`;
         try {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.length > 0) {
-            // Map todayClasses to yesterdayClasses format
-            const mappedClasses = parsed.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              teacher: c.teacher,
-              feedbackCompleted: false,
-              remarks: c.remarks || ''
-            }));
-            setYesterdayClasses(mappedClasses);
+          const res = await db.collection('dashboard_data').doc(docId).get();
+          if (res.data && res.data.length > 0) {
+            return res.data[0].value;
           }
         } catch (e) {
-          console.error("Failed to parse yesterday's todayClasses", e);
+          console.error(`Failed to fetch yesterday's ${key}`, e);
+        }
+        return null;
+      };
+
+      // 1. Carry over todayClasses to yesterdayClasses (Review)
+      if (!docExists1) {
+        const prevTodayClasses = await fetchYesterday('todayClasses');
+        if (prevTodayClasses && prevTodayClasses.length > 0) {
+          const mapped = prevTodayClasses.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            teacher: c.teacher,
+            feedbackCompleted: false,
+            remarks: c.remarks || ''
+          }));
+          setYesterdayClasses(mapped);
         }
       }
-    }
-  }, [init1, docExists, currentDate, setYesterdayClasses]);
 
-  const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15 && init16;
+      // 2. Carry over Finance Records (Accounts Receivable and Invoices)
+      if (!docExists10) {
+        const prevFinance = await fetchYesterday('financeRecords');
+        if (prevFinance && prevFinance.length > 0) {
+          setFinanceRecords(prevFinance);
+        }
+      }
+
+      // 3. Carry over Boss Instructions
+      if (!docExists15) {
+        const prevInstructions = await fetchYesterday('bossInstructions');
+        if (prevInstructions && prevInstructions.length > 0) {
+          setBossInstructions(prevInstructions);
+        }
+      }
+
+      // 4. Carry over Cooperation Note (Joint Programs)
+      if (!docExists13) {
+        const prevNote = await fetchYesterday('cooperationNote');
+        if (prevNote) {
+          setCooperationNote(prevNote);
+        }
+      }
+
+      // 5. Carry over Student Exams
+      if (!docExists16) {
+        const prevExams = await fetchYesterday('studentExams');
+        if (prevExams && prevExams.length > 0) {
+          setStudentExams(prevExams);
+        }
+      }
+
+      // 6. Carry over Student Registrations
+      if (!docExists5) {
+        const prevRegs = await fetchYesterday('studentRegistrations');
+        if (prevRegs && prevRegs.length > 0) {
+          setStudentRegistrations(prevRegs);
+        }
+      }
+
+      // 7. Carry over Trial Classes
+      if (!docExists7) {
+        const prevTrials = await fetchYesterday('trialClasses');
+        if (prevTrials && prevTrials.length > 0) {
+          setTrialClasses(prevTrials);
+        }
+      }
+
+      // 8. Carry over Agency Tracking
+      if (!docExists4) {
+        const prevAgency = await fetchYesterday('agencyTracking');
+        if (prevAgency && prevAgency.length > 0) {
+          setAgencyTracking(prevAgency);
+        }
+      }
+    };
+
+    carryOverData();
+  }, [currentDate, user, isDataLoaded, docExists1, docExists4, docExists5, docExists7, docExists10, docExists13, docExists15, docExists16]);
 
   const performanceData = [
     { name: 'Mon', value: 400 },

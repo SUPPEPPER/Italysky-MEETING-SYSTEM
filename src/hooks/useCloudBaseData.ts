@@ -60,14 +60,14 @@ export function useCloudBaseData<T>(
       setIsInitialized(true);
     });
 
-  }, [key, dateString, userId]);
+  }, [key, dateString, userId, initialValue]);
 
   const updateData = useCallback((newValue: T | ((prev: T) => T)) => {
     if (!userId) return;
 
     setData((prev) => {
       const valueToStore = newValue instanceof Function ? newValue(prev) : newValue;
-      const docId = dateString ? `dashboard_${userId}_${dateString}_${key}` : `dashboard_global_${userId}_${key}`;
+      const docId = dateString ? `dashboard_shared_${dateString}_${key}` : `dashboard_shared_global_${key}`;
       const collectionName = 'dashboard_data';
       
       const docRef = db.collection(collectionName).doc(docId);
