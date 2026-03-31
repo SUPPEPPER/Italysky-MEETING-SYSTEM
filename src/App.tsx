@@ -6,8 +6,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, 
-  Download, 
-  FileSpreadsheet, 
   ChevronLeft, 
   ChevronRight, 
   Calendar, 
@@ -28,11 +26,12 @@ import {
   Trash2,
   X,
   Bell,
-  FileDown,
-  LogOut
+  LogOut,
+  Instagram,
+  Youtube,
+  Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import * as XLSX from 'xlsx';
 import { 
   LineChart, 
   Line, 
@@ -93,8 +92,6 @@ export default function App() {
   const t = translations[lang];
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [exportStartDate, setExportStartDate] = useState(new Date());
-  const [exportEndDate, setExportEndDate] = useState(new Date());
   
   // Format date to YYYY-MM-DD in local time
   const dateString = currentDate.toLocaleDateString('en-CA');
@@ -593,137 +590,25 @@ export default function App() {
       setRedList([]);
       setBossInstructions([]);
       setStudentExams([]);
-    } else if (modalConfig.type === 'exportExcel') {
-      await handleExportExcel();
-      return; // handleExportExcel already closes the modal
     }
 
     closeModal();
   };
 
-  const openExportModal = () => {
-    setExportStartDate(currentDate);
-    setExportEndDate(currentDate);
-    openModal('exportExcel', t.exportExcel);
-  };
-
-  const [isExporting, setIsExporting] = useState(false);
-
-  const handleExportExcel = async () => {
-    try {
-      setIsExporting(true);
-      const start = new Date(exportStartDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(exportEndDate);
-      end.setHours(23, 59, 59, 999);
-
-      if (start > end) {
-        // Use console instead of alert to avoid blocking
-        console.warn('开始日期不能晚于结束日期');
-        setIsExporting(false);
-        return;
-      }
-
-      // Generate all date strings in the range
-      const dateStrings: string[] = [];
-      let current = new Date(start);
-      while (current <= end) {
-        dateStrings.push(current.toLocaleDateString('en-CA'));
-        current.setDate(current.getDate() + 1);
-      }
-
-      let allData: any[] = [];
-
-      // Fetch data for each date
-      for (const ds of dateStrings) {
-        const fetchCollection = async (key: string, sectionName: string) => {
-          const docId = `dashboard_shared_${ds}_${key}`;
-          try {
-            const res = (await db.collection('dashboard_data').doc(docId).get()) as any;
-            let val = null;
-            if (res.data) {
-              if (Array.isArray(res.data) && res.data.length > 0) {
-                val = res.data[0].value;
-              } else if (!Array.isArray(res.data)) {
-                val = res.data.value;
-              }
-            }
-
-            if (val !== null && val !== undefined) {
-              if (Array.isArray(val)) {
-                return val.map((item: any) => ({ Date: ds, Section: sectionName, ...item }));
-              } else if (typeof val === 'string' || typeof val === 'number') {
-                return [{ Date: ds, Section: sectionName, Value: val }];
-              } else if (val && typeof val === 'object') {
-                return [{ Date: ds, Section: sectionName, ...val }];
-              }
-            }
-          } catch (e) {
-            console.error(`Error fetching ${key} for ${ds}:`, e);
-          }
-          return [];
-        };
-
-        const [yClasses, tClasses, tList, fRecords, sExams, sRegs, tTrials, aTracking, bInstructions] = await Promise.all([
-          fetchCollection('yesterdayClasses', '昨日复盘'),
-          fetchCollection('todayClasses', '今日课表'),
-          fetchCollection('todoList', '待办事项'),
-          fetchCollection('financeRecords', '财务记录'),
-          fetchCollection('studentExams', '学生考试'),
-          fetchCollection('studentRegistrations', '学生报名'),
-          fetchCollection('trialClasses', '试听追踪'),
-          fetchCollection('agencyTracking', '中介追踪'),
-          fetchCollection('bossInstructions', '老板指令')
-        ]);
-
-        allData = [...allData, ...yClasses, ...tClasses, ...tList, ...fRecords, ...sExams, ...sRegs, ...tTrials, ...aTracking, ...bInstructions];
-      }
-
-      if (allData.length === 0) {
-        console.warn('该时间段内没有数据可导出');
-        closeModal();
-        return;
-      }
-
-      const ws = XLSX.utils.json_to_sheet(allData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Dashboard Data");
-      
-      // Use a more robust download method
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const fileName = `Dali_Report_${exportStartDate.toLocaleDateString('en-CA')}_to_${exportEndDate.toLocaleDateString('en-CA')}.xlsx`;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      closeModal();
-    } catch (error) {
-      console.error('Excel Export Error:', error);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950/50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
+      <div className="min-h-screen flex items-center justify-center bg-brand-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-red"></div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950/50 p-4">
-        <div className="bg-slate-800/40 p-8 rounded-2xl shadow-2xl shadow-brand-blue/10 w-full max-w-md text-center">
-          <h1 className="text-3xl font-serif font-bold text-slate-100 mb-2">{t.brandName}</h1>
-          <p className="text-slate-400 mb-8">{t.systemName}</p>
+      <div className="min-h-screen flex items-center justify-center bg-brand-white p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl shadow-black/5 w-full max-w-md text-center border border-slate-100">
+          <h1 className="text-3xl font-serif font-bold text-brand-black mb-2">{t.brandName}</h1>
+          <p className="text-slate-500 mb-8">{t.systemName}</p>
           
           <form onSubmit={handleCustomAuth} className="flex flex-col gap-4 mb-4">
             <input
@@ -731,7 +616,7 @@ export default function App() {
               placeholder="用户名 (如: 张三)"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-slate-900/50 text-slate-100 border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 text-brand-black border border-slate-200 focus:border-brand-red focus:ring-2 focus:ring-brand-red/20 outline-none transition-all"
               required
             />
             <input
@@ -739,32 +624,32 @@ export default function App() {
               placeholder="密码"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-slate-900/50 text-slate-100 border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 text-brand-black border border-slate-200 focus:border-brand-red focus:ring-2 focus:ring-brand-red/20 outline-none transition-all"
               required
             />
             <button
               type="submit"
-              className="w-full py-3 px-4 bg-brand-blue hover:bg-blue-700 text-slate-100 rounded-xl font-bold transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 px-4 bg-brand-black hover:bg-slate-800 text-brand-white rounded-xl font-bold transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={authLoading}
             >
               {authLoading ? '处理中...' : (isRegisterMode ? '注册并登录' : '登录')}
             </button>
           </form>
 
-          <div className="flex items-center justify-between text-sm text-slate-400 mb-6">
+          <div className="flex items-center justify-between text-sm text-slate-500 mb-6">
             <button 
               type="button"
               onClick={() => {
                 setIsRegisterMode(!isRegisterMode);
               }}
-              className="hover:text-brand-blue transition-colors"
+              className="hover:text-brand-red transition-colors"
             >
               {isRegisterMode ? '已有账号？去登录' : '没有账号？去注册'}
             </button>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-white/5">
-            <p className="text-xs text-slate-500 italic">
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-400 italic">
               本平台为内部平台，请勿外传链接
             </p>
           </div>
@@ -775,8 +660,12 @@ export default function App() {
 
   if (!isDataLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950/50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <div className="w-16 h-16 border-4 border-brand-black border-t-brand-red rounded-full animate-spin mb-6"></div>
+        <div className="flex flex-col items-center">
+          <h1 className="text-4xl font-serif font-bold tracking-tighter text-brand-black mb-2">VOGUE</h1>
+          <p className="text-[10px] font-bold text-brand-red uppercase tracking-[0.4em]">LOADING SYSTEM</p>
+        </div>
       </div>
     );
   }
@@ -784,60 +673,55 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950/50 font-sans" ref={dashboardRef}>
       {dbError && (
-        <div className="bg-brand-red/10 border-b border-red-200 p-4 text-red-800 text-sm text-center shadow-lg shadow-black/20 relative z-[60]">
-          <p className="font-bold mb-1">⚠️ 数据库连接失败 (网络请求错误)</p>
-          <p>请检查：1. <code>.env</code> 文件中的 <code>VITE_TCB_REGION</code> 是否正确。2. 云开发控制台是否已开启数据库服务。3. 是否已将当前域名添加到“安全应用来源”。</p>
-          <button onClick={() => setDbError(false)} className="absolute right-4 top-4 text-brand-red hover:text-red-700">
-            ✕
-          </button>
+        <div className="bg-brand-red text-white p-4 text-sm text-center shadow-2xl relative z-[60] font-bold">
+          <div className="max-w-6xl mx-auto flex items-center justify-center gap-4">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <div className="flex flex-col sm:flex-row gap-x-4 gap-y-1 items-center">
+              <p className="uppercase tracking-widest">⚠️ 数据库连接失败 (网络请求错误)</p>
+              <p className="text-[10px] opacity-90 font-normal">请检查：1. .env 文件中的 VITE_TCB_REGION 是否正确。2. 云开发控制台是否已开启数据库服务。3. 是否已将当前域名添加到“安全应用来源”。</p>
+            </div>
+            <button onClick={() => setDbError(false)} className="p-1 hover:bg-white/20 transition-colors rounded-none">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       )}
       {/* Header */}
-      <header className="bg-slate-900/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 shadow-lg shadow-brand-blue/5">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-8 py-3">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             {/* Left: Brand and Date Navigation */}
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full lg:w-auto">
               <div className="flex flex-col leading-tight text-center sm:text-left shrink-0">
-                <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-tight text-slate-100 whitespace-nowrap">
+                <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-tight text-brand-black whitespace-nowrap">
                   {t.brandName}
                 </h1>
-                <span className="text-[10px] font-bold text-brand-blue uppercase tracking-[0.2em] whitespace-nowrap">
+                <span className="text-[10px] font-bold text-brand-red uppercase tracking-[0.2em] whitespace-nowrap">
                   {t.systemName}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1.5 rounded-full border border-white/5 w-full sm:w-auto justify-center">
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-none border border-slate-200">
                 <button 
                   onClick={() => changeDate(-1)}
-                  className="p-1.5 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
+                  className="p-2 hover:bg-white rounded-none text-brand-black transition-all"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="flex items-center gap-2 px-1 relative group">
-                  <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />
-                  <input 
-                    type="date" 
-                    value={dateString}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        const [year, month, day] = e.target.value.split('-').map(Number);
-                        setCurrentDate(new Date(year, month - 1, day));
-                      }
-                    }}
-                    className="bg-transparent border-none text-slate-200 font-bold text-sm cursor-pointer hover:text-brand-blue transition-colors outline-none focus:ring-0 w-[115px] p-0"
-                  />
+                <div className="flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-100 shadow-sm min-w-[140px] justify-center">
+                  <Calendar className="w-4 h-4 text-brand-red" />
+                  <span className="text-sm font-bold text-brand-black">{dateString}</span>
                 </div>
                 <button 
                   onClick={() => changeDate(1)}
-                  className="p-1.5 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
+                  className="p-2 hover:bg-white rounded-none text-brand-black transition-all"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-5 h-5" />
                 </button>
-                <div className="w-px h-4 bg-white/10 mx-0.5"></div>
+                <div className="w-px h-4 bg-slate-200 mx-0.5"></div>
                 <button 
                   onClick={() => setCurrentDate(new Date())}
-                  className="px-3 py-1 text-[10px] bg-slate-800 border border-white/10 rounded-full hover:bg-slate-700 hover:text-brand-blue transition-colors whitespace-nowrap font-bold"
+                  className="px-3 py-1 text-[10px] bg-brand-black text-brand-white border border-brand-black hover:bg-brand-red hover:border-brand-red transition-colors whitespace-nowrap font-bold"
                 >
                   {t.today}
                 </button>
@@ -846,12 +730,12 @@ export default function App() {
 
             {/* Right: Actions and User */}
             <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto">
-              <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-white/5">
+              <div className="flex items-center bg-slate-50 p-1 border border-slate-200">
                 <button
                   onClick={() => setLang('zh')}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
-                    lang === 'zh' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
+                    "px-3 py-1.5 text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
+                    lang === 'zh' ? "bg-brand-black text-brand-white shadow-sm" : "text-slate-500 hover:text-brand-black"
                   )}
                 >
                   中文
@@ -859,8 +743,8 @@ export default function App() {
                 <button
                   onClick={() => setLang('it')}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
-                    lang === 'it' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
+                    "px-3 py-1.5 text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
+                    lang === 'it' ? "bg-brand-black text-brand-white shadow-sm" : "text-slate-500 hover:text-brand-black"
                   )}
                 >
                   Italiano
@@ -870,29 +754,21 @@ export default function App() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={() => openModal('clearAll', t.clearAll)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-brand-red/10 text-brand-red hover:bg-brand-red/20 rounded-xl text-xs font-bold transition-all whitespace-nowrap border border-brand-red/20"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-brand-red/10 text-brand-red hover:bg-brand-red/20 rounded-none text-xs font-bold transition-all whitespace-nowrap border border-brand-red/20"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">{t.clearAll}</span>
                 </button>
                 
-                <button
-                  onClick={openExportModal}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20 rounded-xl text-xs font-bold transition-all shadow-lg shadow-brand-blue/5 whitespace-nowrap border border-brand-blue/20"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t.exportExcel}</span>
-                </button>
-
-                <div className="w-px h-6 bg-white/10 mx-0.5"></div>
+                <div className="w-px h-6 bg-slate-200 mx-0.5"></div>
 
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-slate-100 flex items-center justify-center font-bold text-sm shadow-lg shadow-brand-blue/20 border border-white/10 shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-brand-black text-brand-white flex items-center justify-center font-bold text-sm border border-slate-200 shrink-0">
                     {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="p-2 text-slate-400 hover:text-brand-red hover:bg-brand-red/10 rounded-full transition-colors"
+                    className="p-2 text-slate-400 hover:text-brand-red hover:bg-brand-red/10 rounded-none transition-colors"
                     title="退出登录"
                   >
                     <LogOut className="w-4 h-4" />
@@ -905,16 +781,16 @@ export default function App() {
       </header>
 
       {/* Boss Instructions Banner - Redesigned for official look */}
-      <div className="bg-slate-900 border-b border-slate-800">
+      <div className="bg-brand-black border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-8 py-4 flex items-center gap-6">
-          <div className="flex items-center gap-3 bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg shrink-0">
-            <Bell className="w-5 h-5 text-amber-500" />
-            <span className="text-sm font-bold uppercase tracking-[0.2em] text-amber-500">{t.bossInstructions}</span>
+          <div className="flex items-center gap-3 bg-brand-red px-4 py-2 rounded-none shrink-0">
+            <Bell className="w-5 h-5 text-brand-white" />
+            <span className="text-sm font-bold uppercase tracking-[0.2em] text-brand-white">{t.bossInstructions}</span>
           </div>
           <div className="flex-1 flex flex-wrap gap-x-8 gap-y-2">
             {bossInstructions.map((instruction, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-slate-100 font-bold text-sm">
-                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+              <div key={idx} className="flex items-center gap-2 text-brand-white font-bold text-sm">
+                <div className="w-1.5 h-1.5 bg-brand-red rounded-full" />
                 {instruction}
               </div>
             ))}
@@ -942,9 +818,9 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {yesterdayClasses.map(cls => (
-                      <tr key={cls.id} className="hover:bg-slate-950/50 group">
-                        <td className="px-4 py-3 font-bold text-slate-200">{cls.name}</td>
-                        <td className="px-4 py-3 text-slate-400">{cls.teacher}</td>
+                      <tr key={cls.id} className="hover:bg-slate-50 group">
+                        <td className="px-4 py-3 font-bold text-brand-black">{cls.name}</td>
+                        <td className="px-4 py-3 text-slate-500">{cls.teacher}</td>
                         <td className="px-4 py-3">
                           {cls.feedbackCompleted ? (
                             <span className="text-brand-green flex items-center gap-1 font-bold">
@@ -956,12 +832,12 @@ export default function App() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-400">{cls.absentStudents}</td>
-                        <td className="px-4 py-3 text-slate-400 italic text-xs">{cls.remarks}</td>
+                        <td className="px-4 py-3 text-slate-500">{cls.absentStudents}</td>
+                        <td className="px-4 py-3 text-slate-500 italic text-xs">{cls.remarks}</td>
                         <td className="px-4 py-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => openModal('yesterdayClass', t.editRecord, cls, true)} className="p-1 hover:text-brand-blue"><Edit2 className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => handleDelete('yesterdayClass', cls.id)} className="p-1 hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => openModal('yesterdayClass', t.editRecord, cls, true)} className="p-1 hover:text-brand-red transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDelete('yesterdayClass', cls.id)} className="p-1 hover:text-brand-red transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                         </td>
                       </tr>
@@ -975,20 +851,20 @@ export default function App() {
             <SubSection title={t.yesterdayMedia} onAdd={() => openModal('yesterdayMedia', t.addRecord)}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {yesterdayMedia.map(media => (
-                  <div key={media.id} className="p-4 bg-slate-950/50 rounded-xl border border-white/5 relative group">
+                  <div key={media.id} className="p-4 bg-white border border-slate-200 rounded-none relative group hover:border-brand-black transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded uppercase">
+                      <span className="text-xs font-bold text-brand-white bg-brand-black px-2 py-1 rounded-none uppercase">
                         {media.platform}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-300">{media.accountName}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{media.accountName}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-200 mb-2">{media.content}</p>
-                    <div className="text-xs text-slate-400 font-mono bg-slate-800/40 p-2 rounded border border-white/5">
+                    <p className="text-sm font-bold text-brand-black mb-2">{media.content}</p>
+                    <div className="text-xs text-slate-500 font-mono bg-slate-50 p-2 rounded-none border border-slate-100">
                       {media.data}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('yesterdayMedia', t.editRecord, media, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('yesterdayMedia', media.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('yesterdayMedia', t.editRecord, media, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('yesterdayMedia', media.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1004,24 +880,24 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {todayClasses.map(cls => (
                   <div key={cls.id} className={cn(
-                    "p-4 rounded-xl border flex flex-col gap-2 relative group",
-                    cls.type === '线上' ? "bg-blue-50 border-blue-100" : "bg-green-50 border-green-100"
+                    "p-4 rounded-none border flex flex-col gap-2 relative group transition-all hover:border-brand-black",
+                    cls.type === '线上' ? "bg-slate-50 border-slate-200" : "bg-white border-slate-200"
                   )}>
                     <div className="flex items-center justify-between">
                       <span className={cn(
-                        "text-[10px] font-bold px-2 py-1 rounded uppercase",
-                        cls.type === '线上' ? "bg-brand-blue text-slate-100" : "bg-brand-green text-slate-100"
+                        "text-[10px] font-bold px-2 py-1 rounded-none uppercase",
+                        cls.type === '线上' ? "bg-brand-black text-brand-white" : "bg-brand-red text-brand-white"
                       )}>
                         {cls.type === '线上' ? t.online : t.offline}
                       </span>
                       <span className="text-xs font-bold text-slate-400">{cls.time}</span>
                     </div>
-                    <h4 className="text-sm font-bold text-slate-100">{cls.name}</h4>
+                    <h4 className="text-sm font-bold text-brand-black">{cls.name}</h4>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1 text-slate-400">
+                      <span className="flex items-center gap-1 text-slate-500">
                         <MapPin className="w-3 h-3" /> {cls.location}
                       </span>
-                      <span className="font-bold text-slate-300">@{cls.teacher}</span>
+                      <span className="font-bold text-brand-black">@{cls.teacher}</span>
                     </div>
                     {cls.feedbackReminder && (
                       <div className="mt-2 text-[10px] font-bold text-brand-red flex items-center gap-1 animate-pulse">
@@ -1029,8 +905,8 @@ export default function App() {
                       </div>
                     )}
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('todayClass', t.editRecord, cls, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('todayClass', cls.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('todayClass', t.editRecord, cls, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('todayClass', cls.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1041,30 +917,30 @@ export default function App() {
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-brand-red flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-brand-red rounded-full" />
+                  <div className="w-1.5 h-4 bg-brand-red rounded-none" />
                   {t.redList}
                 </h3>
                 <button 
                   onClick={() => openModal('redList', t.addRecord)}
-                  className="p-1.5 bg-brand-red/10 text-brand-red rounded-lg hover:bg-brand-red/20 transition-colors"
+                  className="p-1.5 bg-brand-red/10 text-brand-red rounded-none hover:bg-brand-red/20 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
               <div className="space-y-3">
                 {redList.map(item => (
-                  <div key={item.id} className="p-4 bg-brand-red/10 border border-red-100 rounded-xl flex items-center justify-between relative group">
+                  <div key={item.id} className="p-4 bg-brand-red/5 border border-brand-red/20 rounded-none flex items-center justify-between relative group hover:border-brand-red transition-colors">
                     <div>
-                      <div className="text-sm font-bold text-red-900">{item.name}</div>
+                      <div className="text-sm font-bold text-brand-black">{item.name}</div>
                       <div className="text-[10px] font-bold text-brand-red uppercase tracking-wider">{item.reason}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-slate-800/40 rounded-lg shadow-lg shadow-black/20 text-brand-red group-hover:opacity-0 transition-opacity">
+                      <div className="p-2 text-brand-red group-hover:opacity-0 transition-opacity">
                         <AlertCircle className="w-4 h-4" />
                       </div>
                       <div className="absolute right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openModal('redList', t.editRecord, item, true)} className="p-1.5 bg-slate-800/40 rounded-lg shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete('redList', item.id)} className="p-1.5 bg-slate-800/40 rounded-lg shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => openModal('redList', t.editRecord, item, true)} className="p-1.5 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDelete('redList', item.id)} className="p-1.5 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
                   </div>
@@ -1078,12 +954,12 @@ export default function App() {
         <SectionBlock title={t.todoListTitle} icon={<CheckCircle2 className="w-6 h-6" />}>
           <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-slate-400 font-bold italic">
+              <p className="text-xs text-slate-500 font-bold italic">
                 {t.todoListSubtitle}
               </p>
               <button 
                 onClick={() => openModal('todoItem', t.addRecord)}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-slate-100 rounded-xl text-xs font-bold hover:bg-brand-blue transition-all shadow-lg shadow-black/20"
+                className="flex items-center gap-2 px-4 py-2 bg-brand-black text-brand-white rounded-none text-xs font-bold hover:bg-slate-800 transition-all"
               >
                 <Plus className="w-3.5 h-3.5" /> {t.addTask}
               </button>
@@ -1093,19 +969,19 @@ export default function App() {
               {TODO_ASSIGNEES.map(assignee => {
                 const personTasks = todoList.filter(t => t.assignee === assignee);
                 return (
-                  <div key={assignee} className="flex flex-col gap-3 p-5 bg-slate-800/40 rounded-2xl border border-white/10 shadow-lg shadow-black/20 hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-1">
+                  <div key={assignee} className="flex flex-col gap-3 p-5 bg-white rounded-none border border-slate-200 shadow-sm hover:border-brand-black transition-colors">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-1">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-brand-blue-10 rounded-lg flex items-center justify-center text-brand-blue font-bold text-xs">
+                        <div className="w-8 h-8 bg-brand-black text-brand-white rounded-none flex items-center justify-center font-bold text-xs">
                           {assignee.split(' ')[0][0]}
                         </div>
-                        <h4 className="text-sm font-bold text-slate-100">
+                        <h4 className="text-sm font-bold text-brand-black">
                           {assignee}
                         </h4>
                       </div>
                       <button 
                         onClick={() => openModal('todoItem', `${t.add} ${assignee}`, { assignee })}
-                        className="p-1.5 hover:bg-slate-800/80 rounded-lg text-brand-blue transition-colors"
+                        className="p-1.5 hover:bg-slate-50 rounded-none text-brand-red transition-colors"
                         title={t.addTask}
                       >
                         <Plus className="w-4 h-4" />
@@ -1115,18 +991,18 @@ export default function App() {
                     <div className="flex flex-col gap-3 min-h-[120px]">
                       {personTasks.length > 0 ? (
                         personTasks.map(item => (
-                          <div key={item.id} className="bg-slate-950/50 p-3.5 rounded-xl border border-white/5 group relative hover:border-brand-blue-30 transition-colors">
+                          <div key={item.id} className="bg-slate-50 p-3.5 rounded-none border border-slate-100 group relative hover:border-brand-red transition-colors">
                             <div className="flex flex-col gap-2.5">
                               <p className={cn(
                                 "text-xs font-bold leading-relaxed",
-                                item.isCompleted ? "text-slate-400 line-through" : "text-slate-200"
+                                item.isCompleted ? "text-slate-400 line-through" : "text-brand-black"
                               )}>
                                 {item.task}
                               </p>
                               
                               {item.remarks && (
-                                <div className="text-[10px] text-slate-400 italic bg-slate-800/80 p-2 rounded-lg border border-white/5 flex gap-2">
-                                  <span className="text-slate-300 font-bold">#</span>
+                                <div className="text-[10px] text-slate-500 italic bg-white p-2 rounded-none border border-slate-100 flex gap-2">
+                                  <span className="text-brand-red font-bold">#</span>
                                   {item.remarks}
                                 </div>
                               )}
@@ -1135,10 +1011,10 @@ export default function App() {
                                 <button 
                                   onClick={() => toggleTodoStatus(item.id)}
                                   className={cn(
-                                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all",
+                                    "flex items-center gap-1.5 px-2.5 py-1 rounded-none text-[9px] font-bold transition-all",
                                     item.isCompleted 
-                                      ? "bg-green-100 text-brand-green" 
-                                      : "bg-slate-800/40 text-slate-400 hover:bg-slate-800/80 border border-white/5"
+                                      ? "bg-brand-green text-brand-white" 
+                                      : "bg-white text-slate-400 hover:text-brand-black border border-slate-200"
                                   )}
                                 >
                                   {item.isCompleted ? (
@@ -1151,13 +1027,13 @@ export default function App() {
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => openModal('todoItem', t.editRecord, item, true)} 
-                                    className="p-1.5 hover:text-brand-blue bg-slate-800/40 rounded-md shadow-lg shadow-black/20 border border-white/5"
+                                    className="p-1.5 hover:text-brand-red bg-white border border-slate-200 rounded-none shadow-sm"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                   </button>
                                   <button 
                                     onClick={() => handleDelete('todoItem', item.id)} 
-                                    className="p-1.5 hover:text-brand-red bg-slate-800/40 rounded-md shadow-lg shadow-black/20 border border-white/5"
+                                    className="p-1.5 hover:text-brand-red bg-white border border-slate-200 rounded-none shadow-sm"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                   </button>
@@ -1167,9 +1043,9 @@ export default function App() {
                           </div>
                         ))
                       ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-xl py-6">
-                          <CheckCircle2 className="w-6 h-6 text-slate-100 mb-2" />
-                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{t.noTasks}</span>
+                        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-none py-6">
+                          <CheckCircle2 className="w-6 h-6 text-slate-200 mb-2" />
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.noTasks}</span>
                         </div>
                       )}
                     </div>
@@ -1186,13 +1062,13 @@ export default function App() {
             <SubSection title={t.agencyTracking} onAdd={() => openModal('agencyTracking', t.addRecord)}>
               <div className="space-y-3">
                 {agencyTracking.map(item => (
-                  <div key={item.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
-                    <div className="text-sm font-bold text-slate-200 mb-1">{item.student}</div>
-                    <div className="text-xs text-brand-blue font-bold mb-1">[{item.status}]</div>
-                    <div className="text-[10px] text-brand-red font-bold">{t.deadline}: {item.deadline}</div>
+                  <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-none group relative hover:border-brand-black transition-colors">
+                    <div className="text-sm font-bold text-brand-black mb-2">{item.student}</div>
+                    <div className="text-[10px] text-brand-red font-bold uppercase tracking-widest mb-2">[{item.status}]</div>
+                    <div className="text-[10px] text-slate-400 font-bold italic">{t.deadline}: {item.deadline}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('agencyTracking', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('agencyTracking', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('agencyTracking', t.editRecord, item, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('agencyTracking', item.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1202,15 +1078,15 @@ export default function App() {
             <SubSection title={t.studentRegistration} onAdd={() => openModal('studentRegistration', t.addRecord)}>
               <div className="space-y-3">
                 {studentRegistrations.map(item => (
-                  <div key={item.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
-                    <div className="text-sm font-bold text-slate-200 mb-1">{item.student}</div>
+                  <div key={item.id} className="p-4 bg-slate-50 border border-slate-200 rounded-none group relative hover:border-brand-black transition-colors">
+                    <div className="text-sm font-bold text-brand-black mb-2">{item.student}</div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400">{item.type}</span>
-                      <span className="text-[10px] font-bold text-brand-green">{item.status}</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{item.type}</span>
+                      <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider">{item.status}</span>
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('studentRegistration', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('studentRegistration', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('studentRegistration', t.editRecord, item, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('studentRegistration', item.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1220,12 +1096,12 @@ export default function App() {
             <SubSection title={t.classFormation} onAdd={() => openModal('classFormation', t.addRecord)}>
               <div className="space-y-3">
                 {classFormations.map(item => (
-                  <div key={item.id} className="p-3 bg-yellow-50 rounded-xl border border-yellow-200 relative group">
-                    <div className="text-sm font-bold text-slate-200 mb-1">{item.title}</div>
-                    <div className="text-xs font-bold text-brand-yellow">{item.status}</div>
+                  <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-none group relative hover:border-brand-black transition-colors">
+                    <div className="text-sm font-bold text-brand-black mb-2">{item.title}</div>
+                    <div className="text-[10px] font-bold text-brand-red uppercase tracking-widest">{item.status}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('classFormation', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('classFormation', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('classFormation', t.editRecord, item, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('classFormation', item.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1235,19 +1111,19 @@ export default function App() {
             <SubSection title={t.trialClasses} onAdd={() => openModal('trialClass', t.addRecord)}>
               <div className="space-y-3">
                 {trialClasses.map(item => (
-                  <div key={item.id} className="p-3 bg-blue-50 rounded-xl border border-blue-200 relative group">
+                  <div key={item.id} className="p-4 bg-slate-50 border border-slate-200 rounded-none group relative hover:border-brand-black transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-slate-200">{item.student}</span>
-                      <span className="text-[10px] font-bold text-brand-blue">{item.time}</span>
+                      <span className="text-sm font-bold text-brand-black">{item.student}</span>
+                      <span className="text-[10px] font-bold text-brand-red">{item.time}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 mb-2">{t.channel}: {item.channel}</div>
+                    <div className="text-[10px] text-slate-500 font-bold italic mb-3">{t.channel}: {item.channel}</div>
                     <div className="flex gap-2">
-                      {item.isArranged && <span className="text-[10px] font-bold bg-green-100 text-brand-green px-1.5 py-0.5 rounded">{t.isArranged}</span>}
-                      {item.isFollowUp && <span className="text-[10px] font-bold bg-yellow-100 text-brand-yellow px-1.5 py-0.5 rounded">{t.isFollowUp}</span>}
+                      {item.isArranged && <span className="text-[9px] font-bold bg-brand-black text-brand-white px-2 py-0.5 rounded-none uppercase tracking-wider">{t.isArranged}</span>}
+                      {item.isFollowUp && <span className="text-[9px] font-bold bg-brand-red text-brand-white px-2 py-0.5 rounded-none uppercase tracking-wider">{t.isFollowUp}</span>}
                     </div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('trialClass', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('trialClass', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('trialClass', t.editRecord, item, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('trialClass', item.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1257,16 +1133,16 @@ export default function App() {
             <SubSection title={t.studentExams} onAdd={() => openModal('studentExam', t.addRecord)}>
               <div className="space-y-3">
                 {studentExams.map(item => (
-                  <div key={item.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
+                  <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-none group relative hover:border-brand-black transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-slate-200">{item.student}</span>
-                      <span className="text-[10px] font-bold text-brand-blue">{item.date}</span>
+                      <span className="text-sm font-bold text-brand-black">{item.student}</span>
+                      <span className="text-[10px] font-bold text-brand-red">{item.date}</span>
                     </div>
-                    <div className="text-xs font-bold text-slate-300 mb-1">{item.examName}</div>
-                    <div className="text-[10px] text-brand-red font-bold">{t.score}: {item.score}</div>
+                    <div className="text-xs font-bold text-slate-500 italic mb-2">{item.examName}</div>
+                    <div className="text-[10px] font-bold text-brand-black uppercase tracking-widest">{t.score}: {item.score}</div>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('studentExam', t.editRecord, item, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('studentExam', item.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => openModal('studentExam', t.editRecord, item, true)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3 h-3" /></button>
+                      <button onClick={() => handleDelete('studentExam', item.id)} className="p-1 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 ))}
@@ -1275,29 +1151,28 @@ export default function App() {
           </div>
         </SectionBlock>
 
-        {/* Section 4: Media Operations */}
-        <SectionBlock title={t.mediaOperation} icon={<TrendingUp className="w-6 h-6" />}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <SubSection title={t.todayMediaProduction} onAdd={() => openModal('mediaOperation', t.addRecord)}>
-              <div className="space-y-4">
-                {mediaOperations.map(op => (
-                  <div key={op.id} className="p-4 bg-slate-950/50 rounded-xl border border-white/10 relative group">
-                    <h4 className="text-sm font-bold text-slate-200 mb-2">{t.content}：{op.content}</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {op.platforms.map(p => (
-                        <span key={p} className="text-[10px] font-bold bg-slate-800/40 border border-white/10 px-2 py-1 rounded-full text-slate-400">
-                          {p}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openModal('mediaOperation', t.editRecord, op, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                      <button onClick={() => handleDelete('mediaOperation', op.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
-                    </div>
-                  </div>
-                ))}
+        {/* Section 4: Media Accounts */}
+        <SectionBlock title={lang === 'zh' ? "媒体账号" : "Account Media"} icon={<TrendingUp className="w-6 h-6" />}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { platform: '公众号', name: '@意国蓝天', icon: <MessageSquare className="w-4 h-4" /> },
+              { platform: '视频号', name: '@意国蓝天情报局', icon: <Youtube className="w-4 h-4" /> },
+              { platform: '视频号', name: '@意国蓝天的小日记', icon: <Youtube className="w-4 h-4" /> },
+              { platform: '视频号', name: '@真的徐小翔', icon: <Youtube className="w-4 h-4" /> },
+              { platform: '视频号', name: '@徐大梨', icon: <Youtube className="w-4 h-4" /> },
+              { platform: '小红书', name: '@意小乖', icon: <Instagram className="w-4 h-4" /> },
+              { platform: '小红书', name: '@意国蓝天大梨教育', icon: <Instagram className="w-4 h-4" /> }
+            ].map((account, idx) => (
+              <div key={idx} className="p-5 bg-white border border-slate-200 rounded-none flex items-center gap-5 hover:border-brand-black transition-all group">
+                <div className="w-12 h-12 bg-brand-black text-brand-white flex items-center justify-center rounded-none group-hover:bg-brand-red transition-colors">
+                  {account.icon}
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-1">{account.platform}</div>
+                  <div className="text-sm font-bold text-brand-black font-serif">{account.name}</div>
+                </div>
               </div>
-            </SubSection>
+            ))}
           </div>
         </SectionBlock>
 
@@ -1307,13 +1182,13 @@ export default function App() {
             <SubSection title={t.newLeads} onAdd={() => openModal('newLead', t.addRecord)}>
               <div className="flex flex-wrap gap-2">
                 {salesConversion.newLeads.map((lead, idx) => (
-                  <span key={idx} className="text-xs font-bold bg-blue-50 text-brand-blue border border-blue-100 px-3 py-1.5 rounded-lg flex items-center gap-2 group">
+                  <span key={idx} className="text-xs font-bold bg-slate-50 text-brand-black border border-slate-200 px-4 py-2 rounded-none flex items-center gap-3 group hover:border-brand-red transition-colors">
                     {lead}
                     <button 
                       onClick={() => setSalesConversion(prev => ({ ...prev, newLeads: prev.newLeads.filter((_, i) => i !== idx) }))}
                       className="opacity-0 group-hover:opacity-100 hover:text-brand-red transition-opacity"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </span>
                 ))}
@@ -1323,14 +1198,14 @@ export default function App() {
             <SubSection title={t.followUp} onAdd={() => openModal('followUpCustomer', t.addRecord)}>
               <div className="space-y-3">
                 {salesConversion.followUpCustomers.map((customer, idx) => (
-                  <div key={idx} className="p-3 bg-yellow-50 rounded-xl border border-yellow-200 relative group">
-                    <div className="text-sm font-bold text-slate-200">{customer.name}</div>
-                    <div className="text-xs font-bold text-brand-yellow">{customer.status}</div>
+                  <div key={idx} className="p-4 bg-white border border-slate-200 rounded-none relative group hover:border-brand-black transition-colors">
+                    <div className="text-sm font-bold text-brand-black mb-1">{customer.name}</div>
+                    <div className="text-[10px] font-bold text-brand-red uppercase tracking-widest">{customer.status}</div>
                     <button 
                       onClick={() => setSalesConversion(prev => ({ ...prev, followUpCustomers: prev.followUpCustomers.filter((_, i) => i !== idx) }))}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 hover:text-brand-red transition-opacity"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 hover:text-brand-red transition-opacity p-1 bg-white border border-slate-200 rounded-none shadow-sm"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -1340,17 +1215,17 @@ export default function App() {
             <SubSection title={t.collaboration} onAdd={() => openModal('collaboration', t.addRecord)}>
               <div className="space-y-3">
                 {salesConversion.collaborations.map((collab, idx) => (
-                  <div key={idx} className="p-3 bg-slate-950/50 rounded-xl border border-white/10 relative group">
-                    <p className="text-xs font-bold text-slate-300 mb-2">{collab.task}</p>
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold">
+                  <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-none relative group hover:border-brand-black transition-colors">
+                    <p className="text-xs font-bold text-brand-black mb-3 italic leading-relaxed">{collab.task}</p>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                       <span>{t.from}: {collab.from}</span>
                       <span>{t.to}: {collab.to}</span>
                     </div>
                     <button 
                       onClick={() => setSalesConversion(prev => ({ ...prev, collaborations: prev.collaborations.filter((_, i) => i !== idx) }))}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 hover:text-brand-red transition-opacity"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 hover:text-brand-red transition-opacity p-1 bg-white border border-slate-200 rounded-none shadow-sm"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -1361,32 +1236,32 @@ export default function App() {
 
         {/* Section 6: Finance */}
         <SectionBlock title={t.financeRecords} icon={<CreditCard className="w-6 h-6" />}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {financeRecords.map(record => (
-              <div key={record.id} className="p-4 bg-slate-800/40 border border-white/10 rounded-xl shadow-lg shadow-black/20 flex items-center gap-4 relative group">
+              <div key={record.id} className="p-5 bg-white border border-slate-200 rounded-none shadow-sm flex items-center gap-5 relative group hover:border-brand-black transition-all">
                 <div className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center",
-                  record.type === '应收款' ? "bg-brand-red/10 text-brand-red" : "bg-green-50 text-brand-green"
+                  "w-12 h-12 rounded-none flex items-center justify-center",
+                  record.type === '应收款' ? "bg-brand-red text-brand-white" : "bg-brand-black text-brand-white"
                 )}>
-                  {record.type === '应收款' ? <AlertCircle className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                  {record.type === '应收款' ? <AlertCircle className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">{record.type === '应收款' ? t.receivable : t.invoice}</div>
-                  <div className="text-lg font-bold text-slate-100">¥{record.amount}</div>
-                  <div className="text-[10px] text-slate-400">{record.detail}</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{record.type === '应收款' ? t.receivable : t.invoice}</div>
+                  <div className="text-xl font-bold text-brand-black font-serif">¥{record.amount}</div>
+                  <div className="text-[10px] text-slate-500 italic font-bold">{record.detail}</div>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openModal('financeRecord', t.editRecord, record, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                  <button onClick={() => handleDelete('financeRecord', record.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => openModal('financeRecord', t.editRecord, record, true)} className="p-1.5 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => handleDelete('financeRecord', record.id)} className="p-1.5 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
             ))}
             <button 
               onClick={() => openModal('financeRecord', t.addRecord)}
-              className="p-4 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-blue hover:text-brand-blue transition-all"
+              className="p-5 border-2 border-dashed border-slate-100 rounded-none flex flex-col items-center justify-center gap-2 text-slate-300 hover:text-brand-red hover:border-brand-red transition-all group"
             >
-              <Plus className="w-6 h-6" />
-              <span className="text-xs font-bold">{t.addRecord}</span>
+              <Plus className="w-8 h-8 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">{t.addRecord}</span>
             </button>
           </div>
         </SectionBlock>
@@ -1398,7 +1273,7 @@ export default function App() {
               value={cooperationNote}
               onChange={(e) => setCooperationNote(e.target.value)}
               placeholder={t.cooperationPlaceholder}
-              className="w-full h-32 p-4 bg-slate-800/40 text-slate-100 border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800/10 transition-all resize-none"
+              className="w-full h-32 p-4 bg-white text-brand-black border border-slate-200 rounded-none text-sm focus:outline-none focus:border-brand-black transition-all resize-none font-bold italic"
             />
           </SectionBlock>
 
@@ -1406,8 +1281,8 @@ export default function App() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 {bossInstructions.map((inst, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-slate-950/50 p-3 rounded-xl border border-white/10 group">
-                    <span className="flex-1 text-sm font-bold text-slate-200">{inst}</span>
+                  <div key={idx} className="flex items-center gap-2 bg-slate-50 p-3 rounded-none border border-slate-200 group">
+                    <span className="flex-1 text-sm font-bold text-brand-black">{inst}</span>
                     <button 
                       onClick={() => setBossInstructions(prev => prev.filter((_, i) => i !== idx))}
                       className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-red transition-all"
@@ -1422,7 +1297,7 @@ export default function App() {
                   id="new-instruction"
                   type="text" 
                   placeholder={lang === 'zh' ? "输入新指令..." : "Inserisci nuova istruzione..."}
-                  className="flex-1 px-4 py-2 bg-slate-800/40 text-slate-100 border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800/10"
+                  className="flex-1 px-4 py-2 bg-white text-brand-black border border-slate-200 rounded-none text-sm focus:outline-none focus:border-brand-black font-bold"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const val = (e.target as HTMLInputElement).value;
@@ -1441,7 +1316,7 @@ export default function App() {
                       input.value = '';
                     }
                   }}
-                  className="px-4 py-2 bg-slate-900 text-slate-100 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors"
+                  className="px-4 py-2 bg-brand-black text-brand-white rounded-none text-sm font-bold hover:bg-slate-800 transition-colors"
                 >
                   {t.add}
                 </button>
@@ -1452,26 +1327,26 @@ export default function App() {
 
         {/* Section 8: Offline Visits */}
         <SectionBlock title={t.offlineVisits} icon={<UserPlus className="w-6 h-6" />}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {offlineVisits.map(visit => (
-              <div key={visit.id} className="p-4 bg-slate-800/40 border border-white/10 rounded-xl shadow-lg shadow-black/20 relative group">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-slate-100">{visit.visitor}</span>
-                  <span className="text-xs font-bold text-brand-blue">{visit.time}</span>
+              <div key={visit.id} className="p-5 bg-white border border-slate-200 rounded-none shadow-sm relative group hover:border-brand-black transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-bold text-brand-black">{visit.visitor}</span>
+                  <span className="text-[10px] font-bold text-brand-red uppercase tracking-widest">{visit.time}</span>
                 </div>
-                <p className="text-xs text-slate-400">{t.purposeLabel}{visit.purpose}</p>
+                <p className="text-xs text-slate-500 font-bold italic">{t.purposeLabel}{visit.purpose}</p>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openModal('offlineVisit', t.editRecord, visit, true)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-blue"><Edit2 className="w-3 h-3" /></button>
-                  <button onClick={() => handleDelete('offlineVisit', visit.id)} className="p-1 bg-slate-800/40 rounded shadow-lg shadow-black/20 hover:text-brand-red"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => openModal('offlineVisit', t.editRecord, visit, true)} className="p-1.5 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Edit2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => handleDelete('offlineVisit', visit.id)} className="p-1.5 bg-white border border-slate-200 rounded-none shadow-sm hover:text-brand-red"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
             ))}
             <button 
               onClick={() => openModal('offlineVisit', t.addRecord)}
-              className="p-4 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-blue hover:text-brand-blue transition-all"
+              className="p-5 border-2 border-dashed border-slate-100 rounded-none flex flex-col items-center justify-center gap-2 text-slate-300 hover:text-brand-red hover:border-brand-red transition-all group"
             >
-              <Plus className="w-6 h-6" />
-              <span className="text-xs font-bold">{t.addVisit}</span>
+              <Plus className="w-8 h-8 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">{t.addVisit}</span>
             </button>
           </div>
         </SectionBlock>
@@ -1479,19 +1354,20 @@ export default function App() {
 
       {/* Modal */}
       {isModalOpen && modalConfig && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-slate-800/40 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            className="bg-white rounded-none shadow-2xl w-full max-w-md overflow-hidden border border-brand-black"
           >
-            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-slate-950/50">
-              <h3 className="text-xl font-serif font-bold text-slate-100">{modalConfig.title}</h3>
-              <button onClick={closeModal} className="p-1 hover:bg-slate-700 rounded-full transition-colors">
-                <X className="w-5 h-5" />
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white">
+              <h3 className="text-2xl font-serif font-bold text-brand-black tracking-tight uppercase">{modalConfig.title}</h3>
+              <button onClick={closeModal} className="p-2 hover:bg-slate-100 rounded-none transition-colors">
+                <X className="w-6 h-6" />
               </button>
             </div>
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-8 space-y-6">
+              <div className="space-y-5">
               {modalConfig.type === 'yesterdayClass' && (
                 <>
                   <Input label={t.courseName} name="name" defaultValue={modalConfig.data?.name} required />
@@ -1613,58 +1489,36 @@ export default function App() {
                   <Input label={t.score} name="score" required defaultValue={modalConfig.data?.score || ''} />
                 </>
               )}
-              {modalConfig.type === 'exportExcel' && (
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-bold text-slate-300">开始日期</label>
-                    <input 
-                      type="date" 
-                      value={exportStartDate.toLocaleDateString('en-CA')}
-                      onChange={(e) => setExportStartDate(new Date(e.target.value))}
-                      className="w-full px-4 py-3 bg-slate-950/50 text-slate-100 rounded-xl border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-bold text-slate-300">结束日期</label>
-                    <input 
-                      type="date" 
-                      value={exportEndDate.toLocaleDateString('en-CA')}
-                      onChange={(e) => setExportEndDate(new Date(e.target.value))}
-                      className="w-full px-4 py-3 bg-slate-950/50 text-slate-100 rounded-xl border border-white/10 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              )}
               {modalConfig.type === 'clearAll' && (
-                <div className="py-4 text-center text-slate-300 font-medium">
+                <div className="py-8 text-center text-brand-black font-serif font-bold text-xl italic">
                   {t.confirmClearAll}
                 </div>
               )}
               {modalConfig.type === 'confirmDelete' && (
-                <div className="py-4 text-center text-slate-300 font-medium">
+                <div className="py-8 text-center text-brand-black font-serif font-bold text-xl italic">
                   {t.confirmDelete}
                 </div>
               )}
+              </div>
 
-              <div className="pt-4 flex gap-3">
+              <div className="pt-6 flex gap-4">
                 <button 
                   type="button" 
-                  onClick={closeModal}
-                  className="flex-1 px-4 py-2.5 bg-slate-800/80 text-slate-400 rounded-xl font-bold hover:bg-slate-700 transition-colors"
+                  onClick={closeModal} 
+                  className="flex-1 px-6 py-4 border border-slate-200 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-colors rounded-none"
                 >
                   {t.cancel}
                 </button>
                 <button 
-                  type="submit"
-                  disabled={isExporting}
+                  type="submit" 
                   className={cn(
-                    "flex-1 px-4 py-2.5 text-slate-100 rounded-xl font-bold transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed",
+                    "flex-1 px-6 py-4 text-brand-white font-bold uppercase tracking-widest text-[10px] transition-colors rounded-none",
                     (modalConfig.type === 'clearAll' || modalConfig.type === 'confirmDelete')
-                      ? "bg-brand-red hover:bg-brand-red/80" 
-                      : "bg-brand-blue hover:bg-brand-blue"
+                      ? "bg-brand-red hover:bg-red-700" 
+                      : "bg-brand-black hover:bg-slate-800"
                   )}
                 >
-                  {isExporting ? '导出中...' : (modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : modalConfig.type === 'exportExcel' ? t.exportExcel : t.save)}
+                  {modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : t.save}
                 </button>
               </div>
             </form>
@@ -1673,22 +1527,22 @@ export default function App() {
       )}
       
       {/* Footer / Employee List */}
-      <footer className="bg-slate-900 text-slate-100 p-8 mt-12">
+      <footer className="bg-brand-black text-brand-white p-8 mt-12">
         <div className="max-w-6xl mx-auto">
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
             <Users className="w-4 h-4" /> {t.teamMembers}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
             {EMPLOYEES.map(emp => (
-              <div key={emp} className="flex flex-col items-center gap-2 p-3 bg-slate-800/50 rounded-xl border border-white/10">
-                <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center font-bold text-xs">
+              <div key={emp} className="flex flex-col items-center gap-2 p-3 bg-slate-900 rounded-none border border-slate-800">
+                <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center font-bold text-xs">
                   {emp.split(' ')[0][0]}{emp.split(' ')[1]?.[0] || ''}
                 </div>
                 <span className="text-[10px] font-bold text-center">{emp}</span>
               </div>
             ))}
           </div>
-          <div className="mt-8 pt-8 border-t border-white/10 text-center text-[10px] text-slate-400 font-bold">
+          <div className="mt-8 pt-8 border-t border-slate-800 text-center text-[10px] text-slate-500 font-bold">
             {t.footerText}
           </div>
         </div>
@@ -1733,14 +1587,14 @@ function SubSection({ title, children, onAdd }: SubSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-          <div className="w-1.5 h-4 bg-brand-blue rounded-full" />
+        <h3 className="text-sm font-bold text-brand-black flex items-center gap-2">
+          <div className="w-1.5 h-4 bg-brand-red rounded-none" />
           {title}
         </h3>
         {onAdd && (
           <button 
             onClick={onAdd}
-            className="p-1 hover:bg-slate-800/80 rounded-lg text-brand-blue transition-colors"
+            className="p-1 hover:bg-slate-100 rounded-none text-brand-red transition-colors"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -1756,15 +1610,15 @@ function SubSection({ title, children, onAdd }: SubSectionProps) {
 // Form Components
 function Input({ label, name, defaultValue, required, placeholder, type = "text" }: { label: string; name: string; defaultValue?: string; required?: boolean; placeholder?: string; type?: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-slate-400">{label}</label>
+    <div className="flex flex-col gap-2">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{label}</label>
       <input 
         type={type}
         name={name}
         defaultValue={defaultValue}
         required={required}
         placeholder={placeholder}
-        className="w-full px-3 py-2 bg-slate-950/50 text-slate-100 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
+        className="w-full px-4 py-3 bg-white text-brand-black border border-slate-200 rounded-none text-sm font-bold focus:outline-none focus:border-brand-black transition-all placeholder:text-slate-300 placeholder:font-normal"
       />
     </div>
   );
@@ -1772,12 +1626,12 @@ function Input({ label, name, defaultValue, required, placeholder, type = "text"
 
 function Select({ label, name, options, defaultValue }: { label: string; name: string; options: (string | { label: string; value: string })[]; defaultValue?: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-slate-400">{label}</label>
+    <div className="flex flex-col gap-2">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{label}</label>
       <select 
         name={name}
         defaultValue={defaultValue}
-        className="w-full px-3 py-2 bg-slate-950/50 text-slate-100 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
+        className="w-full px-4 py-3 bg-white text-brand-black border border-slate-200 rounded-none text-sm font-bold focus:outline-none focus:border-brand-black transition-all appearance-none cursor-pointer"
       >
         {options.map(opt => {
           const value = typeof opt === 'string' ? opt : opt.value;
@@ -1791,14 +1645,19 @@ function Select({ label, name, options, defaultValue }: { label: string; name: s
 
 function Checkbox({ label, name, defaultChecked }: { label: string; name: string; defaultChecked?: boolean }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer group">
-      <input 
-        type="checkbox" 
-        name={name}
-        defaultChecked={defaultChecked}
-        className="w-4 h-4 rounded border-white/10 bg-slate-950/50 text-brand-blue focus:ring-brand-blue"
-      />
-      <span className="text-xs font-bold text-slate-400 group-hover:text-slate-100 transition-colors">{label}</span>
+    <label className="flex items-center gap-3 cursor-pointer group">
+      <div className="relative flex items-center justify-center">
+        <input 
+          type="checkbox" 
+          name={name}
+          defaultChecked={defaultChecked}
+          className="peer w-5 h-5 rounded-none border-slate-300 bg-white text-brand-black focus:ring-0 focus:ring-offset-0 transition-all cursor-pointer"
+        />
+        <div className="absolute inset-0 bg-brand-black scale-0 peer-checked:scale-100 transition-transform pointer-events-none flex items-center justify-center">
+          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+        </div>
+      </div>
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-brand-black transition-colors">{label}</span>
     </label>
   );
 }
