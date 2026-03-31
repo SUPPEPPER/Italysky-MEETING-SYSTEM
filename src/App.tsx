@@ -261,7 +261,7 @@ export default function App() {
       yesterdayDate.setDate(yesterdayDate.getDate() - 1);
       const yesterdayDateString = formatDate(yesterdayDate);
 
-      console.log(`[CarryOver] Checking carry-over for ${dateString}. Yesterday was ${yesterdayDateString}`);
+      console.log(`[CarryOver] Starting carry-over for ${dateString}. Yesterday was ${yesterdayDateString}`);
 
       const fetchYesterdayData = async (key: string) => {
         const docId = `dashboard_shared_${yesterdayDateString}_${key}`;
@@ -269,9 +269,11 @@ export default function App() {
           const res = await db.collection('dashboard_data').doc(docId).get();
           const data = res.data as any;
           if (data) {
-            // Handle both array and object formats
+            // Handle both object and array responses from CloudBase
             const value = Array.isArray(data) ? (data.length > 0 ? data[0].value : null) : data.value;
-            return value;
+            if (value !== undefined && value !== null) {
+              return value;
+            }
           }
         } catch (e) {
           console.error(`[CarryOver] Error fetching ${key} for ${yesterdayDateString}:`, e);
@@ -282,6 +284,8 @@ export default function App() {
       // Define which keys we need from yesterday
       const keysToFetch = [
         'todayClasses',      // For mapping to yesterdayClasses
+        'yesterdayMedia',    // For carry over
+        'mediaOperations',   // For carry over
         'financeRecords',    // Continuous
         'agencyTracking',    // Continuous
         'studentRegistrations', // Continuous
@@ -304,6 +308,8 @@ export default function App() {
         yesterdayData[key] = results[i];
       });
 
+      console.log(`[CarryOver] Data fetched for ${yesterdayDateString}:`, Object.keys(yesterdayData).filter(k => yesterdayData[k] !== null));
+
       // 1. Today's Classes (Yesterday) -> Yesterday's Review (Today)
       // Only if today's yesterdayClasses doesn't exist yet
       if (!docExists1) {
@@ -322,64 +328,43 @@ export default function App() {
         }
       }
 
-      // 2. Continuous Tasks (Carry over if today's doc doesn't exist)
+      // 2. Continuous Tasks (Carry over if today's doc doesn't exist AND yesterday has data)
+      // This prevents overwriting with empty data if the fetch failed or yesterday was empty
       
-      // Finance Records
+      // Finance Records (init10)
       if (!docExists10 && yesterdayData['financeRecords'] && Array.isArray(yesterdayData['financeRecords']) && yesterdayData['financeRecords'].length > 0) {
-        console.log(`[CarryOver] Carrying over financeRecords from ${yesterdayDateString} to ${dateString}`);
         setFinanceRecords(yesterdayData['financeRecords']);
       }
 
-      // Academic Affairs (Agency Tracking, Registrations, etc.)
-      if (!docExists4 && yesterdayData['agencyTracking'] && Array.isArray(yesterdayData['agencyTracking']) && yesterdayData['agencyTracking'].length > 0) {
-        setAgencyTracking(yesterdayData['agencyTracking']);
-      }
-      if (!docExists5 && yesterdayData['studentRegistrations'] && Array.isArray(yesterdayData['studentRegistrations']) && yesterdayData['studentRegistrations'].length > 0) {
-        setStudentRegistrations(yesterdayData['studentRegistrations']);
-      }
-      if (!docExists6 && yesterdayData['classFormations'] && Array.isArray(yesterdayData['classFormations']) && yesterdayData['classFormations'].length > 0) {
-        setClassFormations(yesterdayData['classFormations']);
-      }
-      if (!docExists7 && yesterdayData['trialClasses'] && Array.isArray(yesterdayData['trialClasses']) && yesterdayData['trialClasses'].length > 0) {
-        setTrialClasses(yesterdayData['trialClasses']);
-      }
-      if (!docExists16 && yesterdayData['studentExams'] && Array.isArray(yesterdayData['studentExams']) && yesterdayData['studentExams'].length > 0) {
-        setStudentExams(yesterdayData['studentExams']);
-      }
-      if (!docExists11 && yesterdayData['offlineVisits'] && Array.isArray(yesterdayData['offlineVisits']) && yesterdayData['offlineVisits'].length > 0) {
-        setOfflineVisits(yesterdayData['offlineVisits']);
-      }
+      // Academic Affairs
+      if (!docExists4 && yesterdayData['agencyTracking']) setAgencyTracking(yesterdayData['agencyTracking']);
+      if (!docExists5 && yesterdayData['studentRegistrations']) setStudentRegistrations(yesterdayData['studentRegistrations']);
+      if (!docExists6 && yesterdayData['classFormations']) setClassFormations(yesterdayData['classFormations']);
+      if (!docExists7 && yesterdayData['trialClasses']) setTrialClasses(yesterdayData['trialClasses']);
+      if (!docExists16 && yesterdayData['studentExams']) setStudentExams(yesterdayData['studentExams']);
+      if (!docExists11 && yesterdayData['offlineVisits']) setOfflineVisits(yesterdayData['offlineVisits']);
+      if (!docExists15 && yesterdayData['bossInstructions']) setBossInstructions(yesterdayData['bossInstructions']);
+      if (!docExists13 && yesterdayData['cooperationNote']) setCooperationNote(yesterdayData['cooperationNote']);
+      if (!docExists9 && yesterdayData['salesConversion']) setSalesConversion(yesterdayData['salesConversion']);
 
-      // Other Continuous
-      if (!docExists15 && yesterdayData['bossInstructions'] && Array.isArray(yesterdayData['bossInstructions']) && yesterdayData['bossInstructions'].length > 0) {
-        setBossInstructions(yesterdayData['bossInstructions']);
+      // 3. Media and Operations (Carry over if today's doc doesn't exist AND yesterday has data)
+      if (!docExists2 && yesterdayData['yesterdayMedia'] && Array.isArray(yesterdayData['yesterdayMedia']) && yesterdayData['yesterdayMedia'].length > 0) {
+        setYesterdayMedia(yesterdayData['yesterdayMedia']);
       }
-      if (!docExists13 && yesterdayData['cooperationNote']) {
-        setCooperationNote(yesterdayData['cooperationNote']);
-      }
-      if (!docExists9 && yesterdayData['salesConversion']) {
-        setSalesConversion(yesterdayData['salesConversion']);
-      }
-
-      // 3. Initialize Media if empty (not necessarily carry over, just ensuring initial state)
-      // Check if all views/followers are empty to determine if it's "uninitialized"
-      const isMediaEmpty = yesterdayMedia.every(m => !m.views && !m.followers);
-      if (isMediaEmpty) setYesterdayMedia(INITIAL_YESTERDAY_MEDIA);
       
-      const isOpsEmpty = mediaOperations.every(m => !m.content);
-      if (isOpsEmpty) setMediaOperations(INITIAL_MEDIA_OPERATIONS);
+      if (!docExists8 && yesterdayData['mediaOperations'] && Array.isArray(yesterdayData['mediaOperations']) && yesterdayData['mediaOperations'].length > 0) {
+        setMediaOperations(yesterdayData['mediaOperations']);
+      }
 
-      // Reset processing flag
-      isProcessingCarryOver.current = null;
+      console.log(`[CarryOver] Finished carry-over for ${dateString}`);
     };
 
     carryOverData();
 
     return () => {
       isMounted = false;
-      isProcessingCarryOver.current = null;
     };
-  }, [currentDate, user, isDataLoaded, docExists1, docExists4, docExists5, docExists6, docExists7, docExists9, docExists10, docExists11, docExists13, docExists15, docExists16]);
+  }, [currentDate, user, isDataLoaded, docExists1, docExists2, docExists4, docExists5, docExists6, docExists7, docExists8, docExists9, docExists10, docExists11, docExists13, docExists15, docExists16]);
 
   const performanceData = [
     { name: 'Mon', value: 400 },

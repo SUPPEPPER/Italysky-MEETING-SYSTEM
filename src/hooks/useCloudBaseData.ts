@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../cloudbase';
 
 // Global state to track if we've shown the error banner
@@ -74,24 +74,32 @@ export function useCloudBaseData<T>(
     };
   }, [key, dateString, userId, initialValue]);
 
+  const dataRef = useRef<T>(initialValue);
+  
+  // Update ref when data changes
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   const updateData = useCallback((newValue: T | ((prev: T) => T)) => {
     if (!userId) return;
 
-    setData((prev) => {
-      const valueToStore = newValue instanceof Function ? newValue(prev) : newValue;
-      const docId = dateString ? `dashboard_shared_${dateString}_${key}` : `dashboard_shared_global_${key}`;
-      const collectionName = 'dashboard_data';
-      
-      const docRef = db.collection(collectionName).doc(docId);
-      
-      // Use set directly for faster and more reliable updates
-      // Since we store the entire state in the 'value' field, set() is appropriate
-      docRef.set({ value: valueToStore })
-        .then(() => setDocExists(true))
-        .catch(console.error);
+    // Set docExists to true immediately to prevent carry-over logic from re-triggering
+    setDocExists(true);
 
-      return valueToStore;
-    });
+    const finalValue = newValue instanceof Function ? newValue(dataRef.current) : newValue;
+    
+    // Update local state
+    setData(finalValue);
+    dataRef.current = finalValue;
+
+    // Side effect: update CloudBase
+    const docId = dateString ? `dashboard_shared_${dateString}_${key}` : `dashboard_shared_global_${key}`;
+    const docRef = db.collection('dashboard_data').doc(docId);
+    
+    docRef.set({ value: finalValue })
+      .then(() => console.log(`[CloudBase] Successfully saved ${key} for ${dateString || 'global'}`))
+      .catch(err => console.error(`[CloudBase] Error saving ${key}:`, err));
   }, [key, dateString, userId]);
 
   return [data, updateData, isInitialized, docExists];
