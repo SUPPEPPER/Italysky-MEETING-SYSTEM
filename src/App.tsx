@@ -606,8 +606,11 @@ export default function App() {
     openModal('exportExcel', t.exportExcel);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   const handleExportExcel = async () => {
     try {
+      setIsExporting(true);
       const start = new Date(exportStartDate);
       start.setHours(0, 0, 0, 0);
       const end = new Date(exportEndDate);
@@ -615,6 +618,7 @@ export default function App() {
 
       if (start > end) {
         alert('开始日期不能晚于结束日期');
+        setIsExporting(false);
         return;
       }
 
@@ -633,9 +637,16 @@ export default function App() {
         const fetchCollection = async (key: string, sectionName: string) => {
           const docId = `dashboard_shared_${ds}_${key}`;
           try {
-            const res = await db.collection('dashboard_data').doc(docId).get();
-            if (res.data && res.data.length > 0) {
-              const val = res.data[0].value;
+            const res = (await db.collection('dashboard_data').doc(docId).get()) as any;
+            // Handle both array and object response from CloudBase doc().get()
+            let val = null;
+            if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+              val = res.data[0].value;
+            } else if (res.data && !Array.isArray(res.data)) {
+              val = res.data.value;
+            }
+
+            if (val !== null && val !== undefined) {
               if (Array.isArray(val)) {
                 return val.map((item: any) => ({ Date: ds, Section: sectionName, ...item }));
               } else if (typeof val === 'string' || typeof val === 'number') {
@@ -667,6 +678,8 @@ export default function App() {
 
       if (allData.length === 0) {
         alert('该时间段内没有数据可导出');
+        closeModal();
+        setIsExporting(false);
         return;
       }
 
@@ -678,6 +691,8 @@ export default function App() {
     } catch (error) {
       console.error('Excel Export Error:', error);
       alert('Excel 导出失败，请重试');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -765,107 +780,113 @@ export default function App() {
       )}
       {/* Header */}
       <header className="bg-slate-900/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 shadow-lg shadow-brand-blue/5">
-        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full md:w-auto">
-          <div className="flex flex-col leading-tight text-center sm:text-left">
-            <h1 className="text-2xl font-serif font-bold tracking-tight text-slate-100 whitespace-nowrap">
-              {t.brandName}
-            </h1>
-            <span className="text-xs font-bold text-brand-blue uppercase tracking-[0.2em] whitespace-nowrap">
-              {t.systemName}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 bg-slate-800/50 px-3 sm:px-4 py-2 rounded-full text-sm font-bold text-slate-300 border border-white/5 w-full sm:w-auto justify-center">
-            <button 
-              onClick={() => changeDate(-1)}
-              className="p-1 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-2 min-w-[130px] sm:min-w-[140px] justify-center relative group">
-              <Calendar className="w-4 h-4 text-slate-400 absolute left-2 pointer-events-none" />
-              <input 
-                type="date" 
-                value={dateString}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const [year, month, day] = e.target.value.split('-').map(Number);
-                    setCurrentDate(new Date(year, month - 1, day));
-                  }
-                }}
-                className="w-full pl-8 pr-2 py-1 bg-transparent border-none text-slate-200 font-bold cursor-pointer hover:text-brand-blue transition-colors outline-none focus:ring-2 focus:ring-brand-blue/20 rounded-md"
-              />
-            </div>
-            <button 
-              onClick={() => changeDate(1)}
-              className="p-1 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setCurrentDate(new Date())}
-              className="ml-1 sm:ml-2 px-2 py-1 text-[10px] bg-slate-800 border border-white/10 rounded-md hover:bg-slate-700 hover:text-brand-blue transition-colors whitespace-nowrap"
-            >
-              {t.today}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 w-full md:w-auto">
-          <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-white/5">
-            <button
-              onClick={() => setLang('zh')}
-              className={cn(
-                "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
-                lang === 'zh' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
-              )}
-            >
-              中文
-            </button>
-            <button
-              onClick={() => setLang('it')}
-              className={cn(
-                "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
-                lang === 'it' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
-              )}
-            >
-              Italiano
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              onClick={() => openModal('clearAll', t.clearAll)}
-              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-brand-red/10 text-brand-red hover:bg-brand-red/20 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap border border-brand-red/20"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.clearAll}</span>
-            </button>
-            <span className="text-xs text-slate-400 hidden lg:inline-block whitespace-nowrap">
-              {t.printHint}
-            </span>
-            <button
-              onClick={openExportModal}
-              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg shadow-brand-blue/5 whitespace-nowrap border border-brand-blue/20"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.exportExcel}</span>
-            </button>
-            <div className="w-px h-6 bg-white/10 mx-1 sm:mx-2"></div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-slate-100 flex items-center justify-center font-bold text-sm shadow-lg shadow-brand-blue/20">
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-3">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+            {/* Left: Brand and Date Navigation */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 w-full lg:w-auto">
+              <div className="flex flex-col leading-tight text-center sm:text-left shrink-0">
+                <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-tight text-slate-100 whitespace-nowrap">
+                  {t.brandName}
+                </h1>
+                <span className="text-[10px] font-bold text-brand-blue uppercase tracking-[0.2em] whitespace-nowrap">
+                  {t.systemName}
+                </span>
               </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 text-slate-400 hover:text-brand-red hover:bg-brand-red/10 rounded-full transition-colors"
-                title="退出登录"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-full border border-white/5 w-full sm:w-auto justify-center">
+                <button 
+                  onClick={() => changeDate(-1)}
+                  className="p-1.5 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-2 px-2 relative group">
+                  <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="date" 
+                    value={dateString}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [year, month, day] = e.target.value.split('-').map(Number);
+                        setCurrentDate(new Date(year, month - 1, day));
+                      }
+                    }}
+                    className="bg-transparent border-none text-slate-200 font-bold text-sm cursor-pointer hover:text-brand-blue transition-colors outline-none focus:ring-0 w-[110px]"
+                  />
+                </div>
+                <button 
+                  onClick={() => changeDate(1)}
+                  className="p-1.5 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <div className="w-px h-4 bg-white/10 mx-1"></div>
+                <button 
+                  onClick={() => setCurrentDate(new Date())}
+                  className="px-3 py-1 text-[10px] bg-slate-800 border border-white/10 rounded-full hover:bg-slate-700 hover:text-brand-blue transition-colors whitespace-nowrap font-bold"
+                >
+                  {t.today}
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Actions and User */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 sm:gap-4 w-full lg:w-auto">
+              <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-white/5">
+                <button
+                  onClick={() => setLang('zh')}
+                  className={cn(
+                    "px-3 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
+                    lang === 'zh' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
+                  )}
+                >
+                  中文
+                </button>
+                <button
+                  onClick={() => setLang('it')}
+                  className={cn(
+                    "px-3 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
+                    lang === 'it' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
+                  )}
+                >
+                  Italiano
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => openModal('clearAll', t.clearAll)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-brand-red/10 text-brand-red hover:bg-brand-red/20 rounded-xl text-xs font-bold transition-all whitespace-nowrap border border-brand-red/20"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t.clearAll}</span>
+                </button>
+                
+                <button
+                  onClick={openExportModal}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue/20 rounded-xl text-xs font-bold transition-all shadow-lg shadow-brand-blue/5 whitespace-nowrap border border-brand-blue/20"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t.exportExcel}</span>
+                </button>
+
+                <div className="w-px h-6 bg-white/10 mx-1"></div>
+
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-slate-100 flex items-center justify-center font-bold text-sm shadow-lg shadow-brand-blue/20 border border-white/10">
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 text-slate-400 hover:text-brand-red hover:bg-brand-red/10 rounded-full transition-colors"
+                    title="退出登录"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </header>
 
@@ -1621,14 +1642,15 @@ export default function App() {
                 </button>
                 <button 
                   type="submit"
+                  disabled={isExporting}
                   className={cn(
-                    "flex-1 px-4 py-2.5 text-slate-100 rounded-xl font-bold transition-colors shadow-lg",
+                    "flex-1 px-4 py-2.5 text-slate-100 rounded-xl font-bold transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed",
                     (modalConfig.type === 'clearAll' || modalConfig.type === 'confirmDelete')
                       ? "bg-brand-red hover:bg-brand-red/80" 
                       : "bg-brand-blue hover:bg-brand-blue"
                   )}
                 >
-                  {modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : modalConfig.type === 'exportExcel' ? t.exportExcel : t.save}
+                  {isExporting ? '导出中...' : (modalConfig.type === 'clearAll' ? t.clearAll : modalConfig.type === 'confirmDelete' ? t.confirmDelete : modalConfig.type === 'exportExcel' ? t.exportExcel : t.save)}
                 </button>
               </div>
             </form>
