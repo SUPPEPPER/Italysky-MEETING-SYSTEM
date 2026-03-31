@@ -816,7 +816,7 @@ export default function App() {
             <SubSection title={t.yesterdayClasses} onAdd={() => openModal('yesterdayClass', t.addRecord)}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-950/50 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                  <thead className="bg-brand-black text-brand-white font-bold uppercase text-[10px] tracking-wider">
                     <tr>
                       <th className="px-4 py-3">{t.courseName}</th>
                       <th className="px-4 py-3">{t.teacher}</th>
