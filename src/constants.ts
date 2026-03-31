@@ -33,6 +33,8 @@ export const TODO_ASSIGNEES: ToDoItem['assignee'][] = [
   'Zita Zhao'
 ];
 
+export const EMPTY_ARRAY: any[] = [];
+
 export const INITIAL_TODO_LIST: ToDoItem[] = [];
 
 export const INITIAL_YESTERDAY_CLASSES: YesterdayClass[] = [];

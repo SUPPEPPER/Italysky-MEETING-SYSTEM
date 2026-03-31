@@ -78,7 +78,8 @@ import {
   INITIAL_SALES_CONVERSION,
   INITIAL_FINANCE_RECORDS,
   INITIAL_OFFLINE_VISITS,
-  INITIAL_STUDENT_EXAMS
+  INITIAL_STUDENT_EXAMS,
+  EMPTY_ARRAY
 } from './constants';
 import { Language, translations } from './translations';
 
@@ -112,8 +113,8 @@ export default function App() {
   const [offlineVisits, setOfflineVisits, init11, docExists11] = useCloudBaseData<OfflineVisit[]>('offlineVisits', INITIAL_OFFLINE_VISITS, user?.uid, dateString);
   const [studentExams, setStudentExams, init16, docExists16] = useCloudBaseData<StudentExam[]>('studentExams', INITIAL_STUDENT_EXAMS, user?.uid, dateString);
 
-  const [redList, setRedList, init14, docExists14] = useCloudBaseData<{id: string, name: string, reason: string}[]>('redList', [], user?.uid);
-  const [bossInstructions, setBossInstructions, init15, docExists15] = useCloudBaseData<string[]>('bossInstructions', [], user?.uid, dateString);
+  const [redList, setRedList, init14, docExists14] = useCloudBaseData<{id: string, name: string, reason: string}[]>('redList', EMPTY_ARRAY, user?.uid);
+  const [bossInstructions, setBossInstructions, init15, docExists15] = useCloudBaseData<string[]>('bossInstructions', EMPTY_ARRAY, user?.uid, dateString);
   const [todoList, setTodoList, init12, docExists12] = useCloudBaseData<ToDoItem[]>('todoList', INITIAL_TODO_LIST, user?.uid, dateString);
 
   const isDataLoaded = init1 && init2 && init3 && init4 && init5 && init6 && init7 && init8 && init9 && init10 && init11 && init12 && init13 && init14 && init15 && init16;
@@ -331,7 +332,7 @@ export default function App() {
     };
 
     carryOverData();
-  }, [currentDate, user, isDataLoaded, docExists1, docExists4, docExists5, docExists7, docExists10, docExists13, docExists15, docExists16]);
+  }, [currentDate, user, isDataLoaded]);
 
   const performanceData = [
     { name: 'Mon', value: 400 },
@@ -617,7 +618,8 @@ export default function App() {
       end.setHours(23, 59, 59, 999);
 
       if (start > end) {
-        alert('开始日期不能晚于结束日期');
+        // Use console instead of alert to avoid blocking
+        console.warn('开始日期不能晚于结束日期');
         setIsExporting(false);
         return;
       }
@@ -638,12 +640,13 @@ export default function App() {
           const docId = `dashboard_shared_${ds}_${key}`;
           try {
             const res = (await db.collection('dashboard_data').doc(docId).get()) as any;
-            // Handle both array and object response from CloudBase doc().get()
             let val = null;
-            if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-              val = res.data[0].value;
-            } else if (res.data && !Array.isArray(res.data)) {
-              val = res.data.value;
+            if (res.data) {
+              if (Array.isArray(res.data) && res.data.length > 0) {
+                val = res.data[0].value;
+              } else if (!Array.isArray(res.data)) {
+                val = res.data.value;
+              }
             }
 
             if (val !== null && val !== undefined) {
@@ -677,20 +680,31 @@ export default function App() {
       }
 
       if (allData.length === 0) {
-        alert('该时间段内没有数据可导出');
+        console.warn('该时间段内没有数据可导出');
         closeModal();
-        setIsExporting(false);
         return;
       }
 
       const ws = XLSX.utils.json_to_sheet(allData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Dashboard Data");
-      XLSX.writeFile(wb, `Dali_Education_Report_${exportStartDate.toLocaleDateString('en-CA')}_to_${exportEndDate.toLocaleDateString('en-CA')}.xlsx`);
+      
+      // Use a more robust download method
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `Dali_Report_${exportStartDate.toLocaleDateString('en-CA')}_to_${exportEndDate.toLocaleDateString('en-CA')}.xlsx`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
       closeModal();
     } catch (error) {
       console.error('Excel Export Error:', error);
-      alert('Excel 导出失败，请重试');
     } finally {
       setIsExporting(false);
     }
@@ -783,7 +797,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 sm:px-8 py-3">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             {/* Left: Brand and Date Navigation */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full lg:w-auto">
               <div className="flex flex-col leading-tight text-center sm:text-left shrink-0">
                 <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-tight text-slate-100 whitespace-nowrap">
                   {t.brandName}
@@ -793,14 +807,14 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-full border border-white/5 w-full sm:w-auto justify-center">
+              <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1.5 rounded-full border border-white/5 w-full sm:w-auto justify-center">
                 <button 
                   onClick={() => changeDate(-1)}
                   className="p-1.5 hover:text-brand-blue transition-colors rounded-full hover:bg-white/5"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <div className="flex items-center gap-2 px-2 relative group">
+                <div className="flex items-center gap-2 px-1 relative group">
                   <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />
                   <input 
                     type="date" 
@@ -811,7 +825,7 @@ export default function App() {
                         setCurrentDate(new Date(year, month - 1, day));
                       }
                     }}
-                    className="bg-transparent border-none text-slate-200 font-bold text-sm cursor-pointer hover:text-brand-blue transition-colors outline-none focus:ring-0 w-[110px]"
+                    className="bg-transparent border-none text-slate-200 font-bold text-sm cursor-pointer hover:text-brand-blue transition-colors outline-none focus:ring-0 w-[115px] p-0"
                   />
                 </div>
                 <button 
@@ -820,7 +834,7 @@ export default function App() {
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
-                <div className="w-px h-4 bg-white/10 mx-1"></div>
+                <div className="w-px h-4 bg-white/10 mx-0.5"></div>
                 <button 
                   onClick={() => setCurrentDate(new Date())}
                   className="px-3 py-1 text-[10px] bg-slate-800 border border-white/10 rounded-full hover:bg-slate-700 hover:text-brand-blue transition-colors whitespace-nowrap font-bold"
@@ -831,12 +845,12 @@ export default function App() {
             </div>
 
             {/* Right: Actions and User */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 sm:gap-4 w-full lg:w-auto">
+            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto">
               <div className="flex items-center bg-slate-800/50 rounded-xl p-1 border border-white/5">
                 <button
                   onClick={() => setLang('zh')}
                   className={cn(
-                    "px-3 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
+                    "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
                     lang === 'zh' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
                   )}
                 >
@@ -845,7 +859,7 @@ export default function App() {
                 <button
                   onClick={() => setLang('it')}
                   className={cn(
-                    "px-3 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
+                    "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition-all whitespace-nowrap",
                     lang === 'it' ? "bg-brand-blue text-slate-100 shadow-lg shadow-black/20" : "text-slate-400 hover:text-slate-200"
                   )}
                 >
@@ -870,10 +884,10 @@ export default function App() {
                   <span className="hidden sm:inline">{t.exportExcel}</span>
                 </button>
 
-                <div className="w-px h-6 bg-white/10 mx-1"></div>
+                <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-slate-100 flex items-center justify-center font-bold text-sm shadow-lg shadow-brand-blue/20 border border-white/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-blue to-brand-purple text-slate-100 flex items-center justify-center font-bold text-sm shadow-lg shadow-brand-blue/20 border border-white/10 shrink-0">
                     {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                   </div>
                   <button
